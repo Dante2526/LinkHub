@@ -1,0 +1,8 @@
+{
+  "name": "Link Organizer",
+  "description": "Um organizador de links customizável com suporte a temas, vídeos e imagens.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
