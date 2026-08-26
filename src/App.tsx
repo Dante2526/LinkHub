@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { db } from './lib/firebase';
 import { AppData, defaultTheme, defaultProfile, defaultLinks } from './types';
 import { Editor } from './components/Editor';
 import { Preview } from './components/Preview';
+import { Login } from './components/Login';
 import { Smartphone, Monitor, ExternalLink, Settings } from 'lucide-react';
 
 const STORAGE_KEY = 'link-organizer-data';
@@ -27,9 +30,9 @@ function AdminView({ data, setData, onLinkClick }: { data: AppData, setData: (d:
             >
               <Smartphone className="w-4 h-4" /> Ver
             </button>
-            <Link to="/" target="_blank" className="hidden md:flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold hover:bg-blue-200 transition-colors">
+            <a href={window.location.hostname.includes('localhost') ? '/' : `https://${window.location.hostname.replace('-adm', '')}`} target="_blank" rel="noreferrer" className="hidden md:flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold hover:bg-blue-200 transition-colors">
               Público <ExternalLink className="w-4 h-4" />
-            </Link>
+            </a>
           </div>
         </div>
         <div className="flex-1 overflow-hidden">
@@ -48,9 +51,9 @@ function AdminView({ data, setData, onLinkClick }: { data: AppData, setData: (d:
             >
               Voltar ao Editor
             </button>
-            <Link to="/" target="_blank" className="flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold hover:bg-blue-200 transition-colors">
+            <a href={window.location.hostname.includes('localhost') ? '/' : `https://${window.location.hostname.replace('-adm', '')}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold hover:bg-blue-200 transition-colors">
               Público <ExternalLink className="w-4 h-4" />
-            </Link>
+            </a>
           </div>
         )}
 
@@ -110,41 +113,47 @@ function PublicView({ data, onLinkClick, onView }: { data: AppData, onLinkClick:
       <MemoizedPreview data={data} onLinkClick={onLinkClick} />
       
       {/* Small floating button to go back to admin */}
-      <Link 
-        to="/admin" 
+      <a 
+        href={window.location.hostname.includes('localhost') ? '/admin' : `https://${window.location.hostname.replace('.pages.dev', '-adm.pages.dev')}`}
         className="fixed bottom-6 right-6 p-4 bg-white/20 hover:bg-white/40 backdrop-blur-md rounded-full shadow-lg border border-white/30 text-white transition-all z-50 group flex items-center gap-2 overflow-hidden w-[54px] hover:w-[130px]"
       >
         <Settings className="w-5 h-5 flex-shrink-0" style={{ color: data.theme.buttonTextColor }} />
         <span className="text-sm font-semibold opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity" style={{ color: data.theme.buttonTextColor }}>Editar Página</span>
-      </Link>
+      </a>
     </div>
   );
 }
 
 export default function App() {
-  const [data, setData] = useState<AppData>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Failed to parse saved data', e);
-      }
-    }
-    return {
-      profile: defaultProfile,
-      theme: defaultTheme,
-      links: defaultLinks,
-    };
-  });
+  const [data, setData] = useState<AppData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [adminEmail, setAdminEmail] = useState<string | null>(localStorage.getItem('linkhub_admin_email'));
 
-  // Save to local storage whenever data changes
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }, [data]);
+    const docRef = doc(db, 'profiles', 'main');
+    const unsubscribe = onSnapshot(docRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setData(snapshot.data() as AppData);
+      } else {
+        const defaultData = { profile: defaultProfile, theme: defaultTheme, links: defaultLinks };
+        setDoc(docRef, defaultData);
+      }
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleUpdateData = useCallback((updater: AppData | ((prev: AppData) => AppData)) => {
+    setData(prev => {
+      if (!prev) return prev;
+      const newData = typeof updater === 'function' ? updater(prev) : updater;
+      setDoc(doc(db, 'profiles', 'main'), newData);
+      return newData;
+    });
+  }, []);
 
   const handleLinkClick = useCallback((linkId: string) => {
-    setData(prev => ({
+    handleUpdateData(prev => ({
       ...prev,
       links: prev.links.map(l => l.id === linkId ? { 
         ...l, 
@@ -152,20 +161,51 @@ export default function App() {
         clickTimestamps: [...(l.clickTimestamps || []), Date.now()]
       } : l)
     }));
-  }, []);
+  }, [handleUpdateData]);
 
   const handleView = useCallback(() => {
-    setData(prev => ({
+    handleUpdateData(prev => ({
       ...prev,
       views: (prev.views || 0) + 1
     }));
-  }, []);
+  }, [handleUpdateData]);
+
+  const isAdminDomain = window.location.hostname.includes('-adm');
+
+  const handleLogin = (email: string) => {
+    localStorage.setItem('linkhub_admin_email', email);
+    setAdminEmail(email);
+  };
+
+  const renderAdmin = () => {
+    if (!adminEmail) {
+      return <Login onLogin={handleLogin} />;
+    }
+    return <AdminView data={data} setData={handleUpdateData} onLinkClick={handleLinkClick} />;
+  };
+
+  if (loading || !data) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-[#f2f2f2]">
+        <div className="animate-pulse flex flex-col items-center gap-4">
+          <div className="w-12 h-12 rounded-full border-4 border-blue-600 border-t-transparent animate-spin"></div>
+          <p className="text-gray-600 font-medium tracking-tight">Sincronizando com a Nuvem...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<PublicView data={data} onLinkClick={handleLinkClick} onView={handleView} />} />
-        <Route path="/admin" element={<AdminView data={data} setData={setData} onLinkClick={handleLinkClick} />} />
+        {isAdminDomain ? (
+          <Route path="/" element={renderAdmin()} />
+        ) : (
+          <>
+            <Route path="/" element={<PublicView data={data} onLinkClick={handleLinkClick} onView={handleView} />} />
+            <Route path="/admin" element={renderAdmin()} />
+          </>
+        )}
       </Routes>
     </BrowserRouter>
   );
