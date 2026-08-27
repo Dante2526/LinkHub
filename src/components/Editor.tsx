@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppData, LinkItem, Theme } from '../types';
-import { GripVertical, Plus, Trash2, Image as ImageIcon, Video, Palette, Link as LinkIcon, User, Camera, BarChart3, MousePointerClick, Clock, Calendar, Eye } from 'lucide-react';
+import { GripVertical, Plus, Trash2, Image as ImageIcon, Video, Palette, Link as LinkIcon, User, Camera, BarChart3, MousePointerClick, Clock, Calendar, Eye, Loader2, Upload } from 'lucide-react';
 import { ColorPicker } from './ColorPicker';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { collection, getCountFromServer, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import imageCompression from 'browser-image-compression';
+import { db, storage } from '../lib/firebase';
 
 interface EditorProps {
   data: AppData;
@@ -10,37 +14,62 @@ interface EditorProps {
 
 export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'links' | 'theme' | 'stats'>('links');
+  const [uploadingState, setUploadingState] = useState<Record<string, boolean>>({});
+  const [metrics, setMetrics] = useState({ views: 0, clicks: 0, clicksByLink: {} as Record<string, number>, bestDay: '--', bestHour: '--' });
+  const [loadingMetrics, setLoadingMetrics] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'stats') {
+      const fetchMetrics = async () => {
+        setLoadingMetrics(true);
+        try {
+          const viewsSnap = await getCountFromServer(collection(db, 'visualizacoes'));
+          const clicksSnap = await getCountFromServer(collection(db, 'cliques'));
+          
+          const clicksQuery = await getDocs(query(collection(db, 'cliques'), orderBy('time', 'desc'), limit(500)));
+          const clicksByLink: Record<string, number> = {};
+          const hourCounts = new Array(24).fill(0);
+          const dayCounts: Record<string, number> = {};
+          
+          clicksQuery.forEach(doc => {
+            const cData = doc.data();
+            clicksByLink[cData.linkId] = (clicksByLink[cData.linkId] || 0) + 1;
+            
+            if (cData.time) {
+               const date = new Date(cData.time);
+               hourCounts[date.getHours()]++;
+               const dayStr = date.toLocaleDateString('pt-BR', { weekday: 'long' });
+               dayCounts[dayStr] = (dayCounts[dayStr] || 0) + 1;
+            }
+          });
+          
+          const maxHourCount = Math.max(0, ...hourCounts);
+          const bestHour = maxHourCount > 0 ? hourCounts.indexOf(maxHourCount) : null;
+          const bestHourStr = bestHour !== null ? `${bestHour.toString().padStart(2, '0')}:00 - ${(bestHour + 1).toString().padStart(2, '0')}:00` : '--';
+
+          const maxDayCount = Object.keys(dayCounts).length > 0 ? Math.max(...Object.values(dayCounts)) : 0;
+          const bestDay = maxDayCount > 0 ? (Object.entries(dayCounts).find(([_, c]) => c === maxDayCount)?.[0] || '--') : '--';
+          const bestDayFormatted = bestDay !== '--' ? bestDay.charAt(0).toUpperCase() + bestDay.slice(1) : '--';
+          
+          setMetrics({
+            views: viewsSnap.data().count,
+            clicks: clicksSnap.data().count,
+            clicksByLink,
+            bestHour: bestHourStr,
+            bestDay: bestDayFormatted
+          });
+        } catch (e) {
+          console.error("Error fetching metrics", e);
+        } finally {
+          setLoadingMetrics(false);
+        }
+      };
+      fetchMetrics();
+    }
+  }, [activeTab]);
 
   const updateProfile = (field: keyof AppData['profile'], value: string) => {
     onChange({ ...data, profile: { ...data.profile, [field]: value } });
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result;
-      if (typeof result === 'string') {
-        updateProfile('avatarUrl', result);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleLinkImageUpload = (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result;
-      if (typeof result === 'string') {
-        updateLink(id, 'thumbnailUrl', result);
-      }
-    };
-    reader.readAsDataURL(file);
   };
 
   const updateTheme = (field: keyof Theme, value: any) => {
@@ -61,6 +90,47 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
   const updateLink = (id: string, field: keyof LinkItem, value: any) => {
     const newLinks = data.links.map(l => l.id === id ? { ...l, [field]: value } : l);
     onChange({ ...data, links: newLinks });
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video', targetField: keyof Theme | keyof AppData['profile'] | 'linkThumb', linkId?: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (type === 'video' && file.size > 5 * 1024 * 1024) {
+      alert("O arquivo é muito grande. O limite para vídeos/GIFs é de 5MB.");
+      return;
+    }
+
+    const uploadKey = linkId ? `${targetField}-${linkId}` : targetField;
+    setUploadingState(prev => ({ ...prev, [uploadKey]: true }));
+    try {
+      let fileToUpload: File | Blob = file;
+      
+      if (type === 'image') {
+        const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
+        fileToUpload = await imageCompression(file, options);
+      }
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `uploads/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const storageRef = ref(storage, fileName);
+      
+      await uploadBytes(storageRef, fileToUpload);
+      const url = await getDownloadURL(storageRef);
+
+      if (targetField === 'avatarUrl') {
+        updateProfile('avatarUrl', url);
+      } else if (targetField === 'linkThumb' && linkId) {
+        updateLink(linkId, 'thumbnailUrl', url);
+      } else {
+        updateTheme(targetField as keyof Theme, url);
+      }
+    } catch (err) {
+      console.error("Erro no upload", err);
+      alert("Ocorreu um erro ao fazer o upload.");
+    } finally {
+      setUploadingState(prev => ({ ...prev, [uploadKey]: false }));
+    }
   };
 
   const removeLink = (id: string) => {
@@ -162,7 +232,7 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                         <input 
                           type="file" 
                           accept="image/*"
-                          onChange={(e) => handleLinkImageUpload(link.id, e)}
+                          onChange={(e) => handleFileUpload(e, 'image', 'linkThumb', link.id)}
                           className="hidden"
                         />
                       </label>
@@ -255,7 +325,7 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                     <input 
                       type="file" 
                       accept="image/*" 
-                      onChange={handleImageUpload}
+                      onChange={(e) => handleFileUpload(e, 'image', 'avatarUrl')}
                       className="hidden" 
                     />
                   </label>
@@ -389,14 +459,15 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                 {data.theme.backgroundType === 'image' && (
                   <div className="pt-2">
                     <div className="flex items-center justify-center gap-3">
-                       <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 flex-shrink-0">
-                         <ImageIcon className="w-5 h-5" />
-                       </div>
+                       <label className="w-12 h-12 bg-gray-100 hover:bg-gray-200 cursor-pointer rounded-full flex items-center justify-center text-gray-500 transition-colors">
+                         {uploadingState['backgroundImageUrl'] ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
+                         <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, 'image', 'backgroundImageUrl')} className="hidden" />
+                       </label>
                        <input 
                           type="url" 
                           value={data.theme.backgroundImageUrl}
                           onChange={(e) => updateTheme('backgroundImageUrl', e.target.value)}
-                          placeholder="URL da Imagem"
+                          placeholder="Cole a URL ou anexe uma imagem..."
                           className="flex-1 text-center bg-gray-100 border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                        />
                     </div>
@@ -406,14 +477,15 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                 {data.theme.backgroundType === 'video' && (
                   <div className="pt-2">
                     <div className="flex items-center gap-3">
-                       <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400">
-                         <Video className="w-5 h-5" />
-                       </div>
+                       <label className="w-12 h-12 bg-gray-100 hover:bg-gray-200 cursor-pointer rounded-full flex items-center justify-center text-gray-500 transition-colors" title="Upload Vídeo/GIF (Max 5MB)">
+                         {uploadingState['backgroundVideoUrl'] ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
+                         <input type="file" accept="video/*,image/gif" onChange={(e) => handleFileUpload(e, 'video', 'backgroundVideoUrl')} className="hidden" />
+                       </label>
                        <input 
                           type="url" 
                           value={data.theme.backgroundVideoUrl}
                           onChange={(e) => updateTheme('backgroundVideoUrl', e.target.value)}
-                          placeholder="URL do Vídeo (MP4, WebM)"
+                          placeholder="URL do Vídeo (Max 5MB)"
                           className="flex-1 bg-gray-100 border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                        />
                     </div>
@@ -544,31 +616,15 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
           </div>
         )}
 
-        {activeTab === 'stats' && (() => {
-          const allTimestamps = data.links.flatMap(l => l.clickTimestamps || []);
-          const hourCounts = new Array(24).fill(0);
-          const dayCounts: Record<string, number> = {};
-          
-          allTimestamps.forEach(ts => {
-            const date = new Date(ts);
-            hourCounts[date.getHours()]++;
-            const dayStr = date.toLocaleDateString('pt-BR', { weekday: 'long' });
-            dayCounts[dayStr] = (dayCounts[dayStr] || 0) + 1;
-          });
-
-          const maxHourCount = Math.max(0, ...hourCounts);
-          const bestHour = maxHourCount > 0 ? hourCounts.indexOf(maxHourCount) : null;
-          const bestHourStr = bestHour !== null ? `${bestHour.toString().padStart(2, '0')}:00 - ${(bestHour + 1).toString().padStart(2, '0')}:00` : '--';
-
-          const maxDayCount = Object.keys(dayCounts).length > 0 ? Math.max(...Object.values(dayCounts)) : 0;
-          const bestDay = maxDayCount > 0 ? (Object.entries(dayCounts).find(([_, c]) => c === maxDayCount)?.[0] || '--') : '--';
-          const bestDayFormatted = bestDay !== '--' ? bestDay.charAt(0).toUpperCase() + bestDay.slice(1) : '--';
-          
-          const totalClicks = data.links.reduce((acc, link) => acc + (link.clicks || 0), 0);
-          const totalViews = data.views || 0;
-
-          return (
-            <div className="space-y-6 pb-8">
+        {activeTab === 'stats' && (
+          <div className="space-y-6 pb-8">
+            {loadingMetrics ? (
+              <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+                 <Loader2 className="w-8 h-8 animate-spin mb-4" />
+                 <p className="font-medium">Carregando métricas...</p>
+              </div>
+            ) : (
+              <>
               <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-4 text-center">
                 <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-2">
                   <BarChart3 className="w-6 h-6" />
@@ -583,12 +639,12 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                 <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center gap-2">
                   <Eye className="w-6 h-6 text-purple-500 mb-1" />
                   <span className="text-sm font-semibold text-gray-500">Visualizações</span>
-                  <span className="text-2xl font-bold text-gray-900 leading-tight">{totalViews}</span>
+                  <span className="text-2xl font-bold text-gray-900 leading-tight">{metrics.views}</span>
                 </div>
                 <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center gap-2">
                   <MousePointerClick className="w-6 h-6 text-blue-500 mb-1" />
                   <span className="text-sm font-semibold text-gray-500">Total de Cliques</span>
-                  <span className="text-2xl font-bold text-gray-900 leading-tight">{totalClicks}</span>
+                  <span className="text-2xl font-bold text-gray-900 leading-tight">{metrics.clicks}</span>
                 </div>
               </div>
 
@@ -596,12 +652,12 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                 <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center gap-2">
                   <Clock className="w-6 h-6 text-orange-500 mb-1" />
                   <span className="text-sm font-semibold text-gray-500">Horário de Pico</span>
-                  <span className="text-lg font-bold text-gray-900 leading-tight">{bestHourStr}</span>
+                  <span className="text-lg font-bold text-gray-900 leading-tight">{metrics.bestHour}</span>
                 </div>
                 <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center gap-2">
                   <Calendar className="w-6 h-6 text-green-500 mb-1" />
                   <span className="text-sm font-semibold text-gray-500">Melhor Dia</span>
-                  <span className="text-lg font-bold text-gray-900 leading-tight">{bestDayFormatted}</span>
+                  <span className="text-lg font-bold text-gray-900 leading-tight">{metrics.bestDay}</span>
                 </div>
               </div>
 
@@ -611,9 +667,10 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                 </h3>
               
               <div className="space-y-5">
-                {data.links.filter(l => l.isVisible).sort((a, b) => (b.clicks || 0) - (a.clicks || 0)).map((link, idx) => {
-                  const maxClicks = Math.max(...data.links.map(l => l.clicks || 0), 1);
-                  const percentage = Math.round(((link.clicks || 0) / maxClicks) * 100);
+                {data.links.filter(l => l.isVisible).sort((a, b) => (metrics.clicksByLink[b.id] || 0) - (metrics.clicksByLink[a.id] || 0)).map((link, idx) => {
+                  const maxClicks = Math.max(...data.links.map(l => metrics.clicksByLink[l.id] || 0), 1);
+                  const linkClicks = metrics.clicksByLink[link.id] || 0;
+                  const percentage = Math.round((linkClicks / maxClicks) * 100);
                   
                   return (
                     <div key={link.id} className="space-y-2">
@@ -622,7 +679,7 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                           {idx + 1}. {link.title}
                         </span>
                         <span className="font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg flex-shrink-0">
-                          {link.clicks || 0} cliques
+                          {linkClicks} cliques
                         </span>
                       </div>
                       <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
@@ -642,9 +699,10 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                 )}
               </div>
             </div>
+            </>
+          )}
           </div>
-          );
-        })()}
+        )}
       </div>
     </div>
   );

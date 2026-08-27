@@ -29,8 +29,6 @@ export interface LinkItem {
   thumbnailUrl: string;
   isVisible: boolean;
   animation?: LinkAnimation;
-  clicks?: number;
-  clickTimestamps?: number[];
 }
 
 export interface Profile {
@@ -43,7 +41,6 @@ export interface AppData {
   profile: Profile;
   theme: Theme;
   links: LinkItem[];
-  views?: number;
 }
 
 export const defaultTheme: Theme = {

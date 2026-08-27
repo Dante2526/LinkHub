@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, collection, addDoc } from 'firebase/firestore';
 import { db } from './lib/firebase';
 import { AppData, defaultTheme, defaultProfile, defaultLinks } from './types';
 import { Editor } from './components/Editor';
 import { Preview } from './components/Preview';
 import { Login } from './components/Login';
-import { Smartphone, Monitor, ExternalLink, Settings } from 'lucide-react';
+import { Smartphone, Monitor, ExternalLink } from 'lucide-react';
 
 const STORAGE_KEY = 'link-organizer-data';
 
@@ -112,14 +112,7 @@ function PublicView({ data, onLinkClick, onView }: { data: AppData, onLinkClick:
     <div className="w-full h-[100dvh] relative">
       <MemoizedPreview data={data} onLinkClick={onLinkClick} />
       
-      {/* Small floating button to go back to admin */}
-      <a 
-        href={window.location.hostname.includes('localhost') ? '/admin' : `https://${window.location.hostname.replace('.pages.dev', '-adm.pages.dev')}`}
-        className="fixed bottom-6 right-6 p-4 bg-white/20 hover:bg-white/40 backdrop-blur-md rounded-full shadow-lg border border-white/30 text-white transition-all z-50 group flex items-center gap-2 overflow-hidden w-[54px] hover:w-[130px]"
-      >
-        <Settings className="w-5 h-5 flex-shrink-0" style={{ color: data.theme.buttonTextColor }} />
-        <span className="text-sm font-semibold opacity-0 group-hover:opacity-100 whitespace-nowrap transition-opacity" style={{ color: data.theme.buttonTextColor }}>Editar Página</span>
-      </a>
+      
     </div>
   );
 }
@@ -130,7 +123,7 @@ export default function App() {
   const [adminEmail, setAdminEmail] = useState<string | null>(localStorage.getItem('linkhub_admin_email'));
 
   useEffect(() => {
-    const docRef = doc(db, 'profiles', 'main');
+    const docRef = doc(db, 'perfis', 'principal');
     const unsubscribe = onSnapshot(docRef, (snapshot) => {
       if (snapshot.exists()) {
         setData(snapshot.data() as AppData);
@@ -147,28 +140,22 @@ export default function App() {
     setData(prev => {
       if (!prev) return prev;
       const newData = typeof updater === 'function' ? updater(prev) : updater;
-      setDoc(doc(db, 'profiles', 'main'), newData);
+      setDoc(doc(db, 'perfis', 'principal'), newData);
       return newData;
     });
   }, []);
 
   const handleLinkClick = useCallback((linkId: string) => {
-    handleUpdateData(prev => ({
-      ...prev,
-      links: prev.links.map(l => l.id === linkId ? { 
-        ...l, 
-        clicks: (l.clicks || 0) + 1,
-        clickTimestamps: [...(l.clickTimestamps || []), Date.now()]
-      } : l)
-    }));
-  }, [handleUpdateData]);
+    addDoc(collection(db, 'cliques'), { linkId, time: Date.now() }).catch(console.error);
+  }, []);
 
   const handleView = useCallback(() => {
-    handleUpdateData(prev => ({
-      ...prev,
-      views: (prev.views || 0) + 1
-    }));
-  }, [handleUpdateData]);
+    const hasViewed = sessionStorage.getItem('linkhub_has_viewed');
+    if (!hasViewed) {
+      addDoc(collection(db, 'visualizacoes'), { time: Date.now() }).catch(console.error);
+      sessionStorage.setItem('linkhub_has_viewed', 'true');
+    }
+  }, []);
 
   const isAdminDomain = window.location.hostname.includes('-adm');
 
@@ -181,7 +168,7 @@ export default function App() {
     if (!adminEmail) {
       return <Login onLogin={handleLogin} />;
     }
-    return <AdminView data={data} setData={handleUpdateData} onLinkClick={handleLinkClick} />;
+    return <AdminView data={data} setData={handleUpdateData} onLinkClick={() => {}} />;
   };
 
   if (loading || !data) {
