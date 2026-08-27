@@ -81,9 +81,9 @@ function AdminView({ data, setData, onLinkClick }: { data: AppData, setData: (d:
         <div className="flex-1 overflow-hidden flex items-center justify-center p-8">
           <div 
             className={`
-              relative overflow-hidden transition-all duration-500 ease-in-out shadow-lg
+              relative overflow-hidden transition-all duration-500 ease-in-out shadow-lg shrink-0
               ${previewMode === 'mobile' 
-                ? 'w-[320px] h-[640px] rounded-[2.5rem] border-[12px] border-black' 
+                ? 'h-full max-h-[720px] aspect-[9/19] rounded-[2.5rem] border-[12px] border-black' 
                 : 'w-full h-full max-w-5xl rounded-3xl border border-gray-200'
               }
             `}
