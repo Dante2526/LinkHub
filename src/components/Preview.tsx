@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppData, Theme } from '../types';
 import { ExternalLink, Share2, X } from 'lucide-react';
+import { db } from '../lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -137,6 +139,46 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
   const { profile, theme, links } = data;
   const isAnimated = theme.backgroundType === 'animated-gradient';
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const url = theme.backgroundVideoUrl;
+    let objectUrl: string | null = null;
+    let isMounted = true;
+    
+    if (url && url.startsWith('firestore_chunked|')) {
+      const [, fileId, chunksStr] = url.split('|');
+      const totalChunks = parseInt(chunksStr, 10);
+      
+      const loadVideo = async () => {
+        try {
+          let base64String = '';
+          for (let i = 0; i < totalChunks; i++) {
+            const snap = await getDoc(doc(db, 'media_chunks', `${fileId}_chunk_${i}`));
+            if (snap.exists()) {
+              base64String += snap.data().data;
+            }
+          }
+          if (isMounted && base64String) {
+             const res = await fetch(base64String);
+             const blob = await res.blob();
+             objectUrl = URL.createObjectURL(blob);
+             setResolvedVideoUrl(objectUrl);
+          }
+        } catch (err) {
+          console.error("Erro ao remontar video", err);
+        }
+      };
+      loadVideo();
+      
+      return () => {
+        isMounted = false;
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+      };
+    } else {
+      setResolvedVideoUrl(url || null);
+    }
+  }, [theme.backgroundVideoUrl]);
 
   const publicUrl = typeof window !== 'undefined' ? window.location.origin : 'https://linkhub.com';
 
@@ -155,15 +197,16 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
       </button>
 
       {/* Video Background Layer */}
-      {theme.backgroundType === 'video' && theme.backgroundVideoUrl && (
+      {theme.backgroundType === 'video' && resolvedVideoUrl && (
         <video 
+          key={resolvedVideoUrl}
           autoPlay 
           loop 
           muted 
           playsInline
           className="fixed inset-0 w-full h-full object-cover -z-10"
         >
-          <source src={theme.backgroundVideoUrl} type="video/mp4" />
+          <source src={resolvedVideoUrl} />
         </video>
       )}
 

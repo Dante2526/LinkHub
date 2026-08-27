@@ -3,7 +3,7 @@ import { AppData, LinkItem, Theme } from '../types';
 import { GripVertical, Plus, Trash2, Image as ImageIcon, Video, Palette, Link as LinkIcon, User, Camera, BarChart3, MousePointerClick, Clock, Calendar, Eye, Loader2, Upload } from 'lucide-react';
 import { ColorPicker } from './ColorPicker';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, getCountFromServer, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { collection, getCountFromServer, getDocs, query, orderBy, limit, setDoc, doc } from 'firebase/firestore';
 import imageCompression from 'browser-image-compression';
 import { db, storage } from '../lib/firebase';
 
@@ -15,6 +15,7 @@ interface EditorProps {
 export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'links' | 'theme' | 'stats'>('links');
   const [uploadingState, setUploadingState] = useState<Record<string, boolean>>({});
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [metrics, setMetrics] = useState({ views: 0, clicks: 0, clicksByLink: {} as Record<string, number>, bestDay: '--', bestHour: '--' });
   const [loadingMetrics, setLoadingMetrics] = useState(false);
 
@@ -106,17 +107,52 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
     try {
       let fileToUpload: File | Blob = file;
       
-      if (type === 'image') {
+      // Apenas comprime se for realmente uma imagem (evita travar se o usuário forçar um MP4 no input de imagem)
+      if (type === 'image' && file.type.startsWith('image/')) {
         const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
         fileToUpload = await imageCompression(file, options);
+      } else if (type === 'image' && !file.type.startsWith('image/')) {
+        alert("Por favor, selecione um arquivo de imagem válido.");
+        setUploadingState(prev => ({ ...prev, [uploadKey]: false }));
+        return;
       }
 
-      const fileExt = file.name.split('.').pop();
-      const fileName = `uploads/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const storageRef = ref(storage, fileName);
-      
-      await uploadBytes(storageRef, fileToUpload);
-      const url = await getDownloadURL(storageRef);
+      let url = "";
+
+      if (type === 'video') {
+        // Quebra em chunks no Firestore para vídeos
+        const base64String = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        // Base64 tem ~33% overhead: 600KB de chars → ~450KB de binário real → seguro abaixo de 1MB por doc
+        const chunkSize = 600 * 1024; // caracteres, NÃO bytes de arquivo
+        const totalChunks = Math.ceil(base64String.length / chunkSize);
+        const fileId = `vid_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+        for (let i = 0; i < totalChunks; i++) {
+          const chunkData = base64String.slice(i * chunkSize, (i + 1) * chunkSize);
+          await setDoc(doc(db, 'media_chunks', `${fileId}_chunk_${i}`), {
+            data: chunkData,
+            index: i,
+            fileId: fileId
+          });
+          setUploadProgress(prev => ({ ...prev, [uploadKey]: Math.round(((i + 1) / totalChunks) * 100) }));
+        }
+        
+        url = `firestore_chunked|${fileId}|${totalChunks}`;
+      } else {
+        // Fluxo normal via Firebase Storage para imagens
+        const fileExt = file.name.split('.').pop();
+        const fileName = `uploads/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const storageRef = ref(storage, fileName);
+        
+        await uploadBytes(storageRef, fileToUpload);
+        url = await getDownloadURL(storageRef);
+      }
 
       if (targetField === 'avatarUrl') {
         updateProfile('avatarUrl', url);
@@ -130,6 +166,7 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
       alert("Ocorreu um erro ao fazer o upload.");
     } finally {
       setUploadingState(prev => ({ ...prev, [uploadKey]: false }));
+      setUploadProgress(prev => ({ ...prev, [uploadKey]: 0 }));
     }
   };
 
@@ -478,7 +515,12 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                   <div className="pt-2">
                     <div className="flex items-center gap-3">
                        <label className="w-12 h-12 bg-gray-100 hover:bg-gray-200 cursor-pointer rounded-full flex items-center justify-center text-gray-500 transition-colors" title="Upload Vídeo/GIF (Max 5MB)">
-                         {uploadingState['backgroundVideoUrl'] ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
+                         {uploadingState['backgroundVideoUrl'] ? (
+                           <div className="flex flex-col items-center">
+                             <Loader2 className="w-4 h-4 animate-spin" />
+                             {uploadProgress['backgroundVideoUrl'] > 0 && <span className="text-[10px] leading-tight font-medium mt-0.5">{uploadProgress['backgroundVideoUrl']}%</span>}
+                           </div>
+                         ) : <Upload className="w-5 h-5" />}
                          <input type="file" accept="video/*,image/gif" onChange={(e) => handleFileUpload(e, 'video', 'backgroundVideoUrl')} className="hidden" />
                        </label>
                        <input 
