@@ -385,35 +385,6 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                 <span className="text-xs text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full font-semibold">Geral</span>
               </div>
 
-              {/* Alinhamento do Texto */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block">Alinhamento do Texto</label>
-                <div className="grid grid-cols-2 gap-2 bg-gray-100 p-1 rounded-2xl">
-                  <button
-                    type="button"
-                    onClick={() => updateTheme('linkTextAlign', 'center')}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                      (data.theme.linkTextAlign ?? 'center') === 'center'
-                        ? 'bg-white text-blue-600 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    Centralizado (Padrão)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateTheme('linkTextAlign', 'left')}
-                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                      data.theme.linkTextAlign === 'left'
-                        ? 'bg-white text-blue-600 shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900'
-                    }`}
-                  >
-                    À Esquerda
-                  </button>
-                </div>
-              </div>
-
               {/* Cor do Texto nos Cartões */}
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block">Cor do Texto dos Cartões</label>
@@ -624,23 +595,25 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                     </div>
 
                     {/* Personalizar cores deste link individual */}
-                    <div className="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
-                      <span className="font-medium text-[11px]">Cores deste link:</span>
-                      <div className="flex items-center gap-2">
+                    <div className="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500">
+                      <span className="font-semibold text-xs text-gray-700">Cores deste link:</span>
+                      <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1.5" title="Cor do texto deste link">
-                          <span className="text-[10px] text-gray-400">Texto</span>
+                          <span className="text-xs text-gray-500">Texto</span>
                           <ColorPicker 
                             color={link.textColor || data.theme.buttonTextColor || '#000000'}
                             onChange={(color) => updateLink(link.id, 'textColor', color)}
-                            className="w-7 h-7"
+                            title="Cor do Texto"
+                            className="w-8 h-8"
                           />
                         </div>
                         <div className="flex items-center gap-1.5" title="Cor do fundo deste link">
-                          <span className="text-[10px] text-gray-400">Fundo</span>
+                          <span className="text-xs text-gray-500">Fundo</span>
                           <ColorPicker 
                             color={link.buttonColor || data.theme.buttonColor || '#ffffff'}
                             onChange={(color) => updateLink(link.id, 'buttonColor', color)}
-                            className="w-7 h-7"
+                            title="Cor do Fundo"
+                            className="w-8 h-8"
                           />
                         </div>
                         {(link.textColor || link.buttonColor) && (
@@ -650,8 +623,8 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                               updateLink(link.id, 'textColor', undefined);
                               updateLink(link.id, 'buttonColor', undefined);
                             }}
-                            className="text-[10px] text-blue-600 hover:underline ml-1"
-                            title="Usar cor padrão dos cartões"
+                            className="text-xs text-blue-600 font-semibold hover:underline ml-1"
+                            title="Restaurar cores padrão"
                           >
                             Resetar
                           </button>
@@ -1005,35 +978,6 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                     onClick={() => updateTheme('buttonStyle', 'glass')}
                     className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.buttonStyle === 'glass' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
                   >Vidro</button>
-                </div>
-
-                {/* Alinhamento do texto dos links */}
-                <div className="space-y-1.5 pt-1 text-left">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block text-center">Alinhamento do Texto nos Cartões</label>
-                  <div className="grid grid-cols-2 gap-2 bg-gray-100 p-1 rounded-2xl">
-                    <button
-                      type="button"
-                      onClick={() => updateTheme('linkTextAlign', 'center')}
-                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                        (data.theme.linkTextAlign ?? 'center') === 'center'
-                          ? 'bg-white text-blue-600 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      Centralizado (Padrão)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateTheme('linkTextAlign', 'left')}
-                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                        data.theme.linkTextAlign === 'left'
-                          ? 'bg-white text-blue-600 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      À Esquerda
-                    </button>
-                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
