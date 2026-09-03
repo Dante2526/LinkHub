@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AppData, Theme } from '../types';
-import { ExternalLink, Share2, X } from 'lucide-react';
+import { Share2, X } from 'lucide-react';
 import { db, isFirebaseConfigured } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -336,26 +336,18 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
                 ) : format === 'compact' ? (
                   isCentered ? (
                     <div className="relative w-full flex items-center justify-center min-h-[46px] py-2 px-3 text-center">
-                      {link.thumbnailUrl ? (
+                      {link.thumbnailUrl && (
                         <img src={link.thumbnailUrl} alt="" className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full object-cover flex-shrink-0" />
-                      ) : (
-                        <div className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/5 flex items-center justify-center flex-shrink-0">
-                          <ExternalLink className="w-4 h-4 opacity-75" style={{ color: linkTextColor }} />
-                        </div>
                       )}
-                      <div className="w-full px-9 flex flex-col items-center justify-center text-center">
+                      <div className={`w-full ${link.thumbnailUrl ? 'px-9' : 'px-2'} flex flex-col items-center justify-center text-center`}>
                         <div className="font-medium text-sm leading-snug break-words">{link.title}</div>
                         {link.description && <div className="text-xs opacity-80 mt-0.5 leading-snug break-words">{link.description}</div>}
                       </div>
                     </div>
                   ) : (
                     <div className="w-full flex items-center min-h-[46px] py-2 px-3 text-left">
-                      {link.thumbnailUrl ? (
+                      {link.thumbnailUrl && (
                         <img src={link.thumbnailUrl} alt="" className="w-8 h-8 rounded-full object-cover ml-1 mr-3 flex-shrink-0" />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center ml-1 mr-3 flex-shrink-0">
-                          <ExternalLink className="w-4 h-4 opacity-75" style={{ color: linkTextColor }} />
-                        </div>
                       )}
                       <div className="flex-1 pr-2">
                         <div className="font-medium text-sm leading-snug break-words">{link.title}</div>
@@ -387,28 +379,24 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
                   // Formato Classic (Padrão)
                   isCentered ? (
                     <div className="relative w-full flex items-center justify-center min-h-[58px] py-3.5 px-4 text-center">
-                      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center bg-black/5 rounded-full overflow-hidden flex-shrink-0">
-                        {link.thumbnailUrl ? (
+                      {link.thumbnailUrl && (
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-full overflow-hidden flex-shrink-0">
                           <img src={link.thumbnailUrl} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <ExternalLink className="w-5 h-5 opacity-75" style={{ color: linkTextColor }} />
-                        )}
-                      </div>
+                        </div>
+                      )}
                       
-                      <div className="w-full px-12 flex flex-col items-center justify-center text-center">
+                      <div className={`w-full ${link.thumbnailUrl ? 'px-12' : 'px-2'} flex flex-col items-center justify-center text-center`}>
                         <div className="font-semibold text-base sm:text-lg leading-snug break-words">{link.title}</div>
                         {link.description && <div className="text-xs sm:text-sm opacity-80 mt-0.5 leading-snug break-words">{link.description}</div>}
                       </div>
                     </div>
                   ) : (
                     <div className="w-full flex items-center min-h-[58px] py-3.5 px-4 text-left">
-                      <div className="flex-shrink-0 w-11 h-11 flex items-center justify-center bg-black/5 rounded-full overflow-hidden mr-3.5">
-                        {link.thumbnailUrl ? (
+                      {link.thumbnailUrl && (
+                        <div className="flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-full overflow-hidden mr-3.5">
                           <img src={link.thumbnailUrl} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <ExternalLink className="w-5 h-5 opacity-75" style={{ color: linkTextColor }} />
-                        )}
-                      </div>
+                        </div>
+                      )}
                       
                       <div className="flex-1">
                         <div className="font-semibold text-base sm:text-lg leading-snug break-words">{link.title}</div>
