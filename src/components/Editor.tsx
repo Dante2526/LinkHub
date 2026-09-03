@@ -23,37 +23,68 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
   const bgVideoInputRef = useRef<HTMLInputElement>(null);
 
   // Helper nativo e ultrarrápido para comprimir imagem no dispositivo sem depender de web workers
-  const compressImageToDataUrl = (file: File, maxDimension = 600, quality = 0.82): Promise<string> => {
+  const compressImageToDataUrl = (file: File, maxDimension = 320, quality = 0.75): Promise<string> => {
     return new Promise((resolve) => {
+      // Timeout de segurança para garantir que nunca fique preso indefinidamente
+      const safetyTimer = setTimeout(() => {
+        try {
+          resolve(URL.createObjectURL(file));
+        } catch {
+          resolve('');
+        }
+      }, 3000);
+
       const reader = new FileReader();
       reader.onload = (readerEvent) => {
+        const result = (readerEvent.target?.result as string) || '';
+        if (!result) {
+          clearTimeout(safetyTimer);
+          resolve(URL.createObjectURL(file));
+          return;
+        }
+
         const img = new Image();
         img.onload = () => {
-          let { width, height } = img;
-          if (width > maxDimension || height > maxDimension) {
-            if (width > height) {
-              height = Math.round((height * maxDimension) / width);
-              width = maxDimension;
-            } else {
-              width = Math.round((width * maxDimension) / height);
-              height = maxDimension;
+          clearTimeout(safetyTimer);
+          try {
+            let { width, height } = img;
+            if (width > maxDimension || height > maxDimension) {
+              if (width > height) {
+                height = Math.round((height * maxDimension) / width);
+                width = maxDimension;
+              } else {
+                width = Math.round((width * maxDimension) / height);
+                height = maxDimension;
+              }
             }
-          }
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', quality));
-          } else {
-            resolve((readerEvent.target?.result as string) || '');
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, width);
+            canvas.height = Math.max(1, height);
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, width, height);
+              resolve(canvas.toDataURL('image/jpeg', quality));
+            } else {
+              resolve(result);
+            }
+          } catch {
+            resolve(result);
           }
         };
-        img.onerror = () => resolve((readerEvent.target?.result as string) || '');
-        img.src = (readerEvent.target?.result as string) || '';
+        img.onerror = () => {
+          clearTimeout(safetyTimer);
+          resolve(result);
+        };
+        img.src = result;
       };
-      reader.onerror = () => resolve('');
+      reader.onerror = () => {
+        clearTimeout(safetyTimer);
+        try {
+          resolve(URL.createObjectURL(file));
+        } catch {
+          resolve('');
+        }
+      };
       reader.readAsDataURL(file);
     });
   };
@@ -157,43 +188,18 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
     setUploadingState(prev => ({ ...prev, [uploadKey]: true }));
     try {
       if (type === 'image') {
-        if (!file.type.startsWith('image/')) {
-          alert("Por favor, selecione um arquivo de imagem válido (PNG, JPG, WEBP, GIF).");
-          setUploadingState(prev => ({ ...prev, [uploadKey]: false }));
-          e.target.value = '';
-          return;
-        }
-
-        // Comprime a imagem de forma instantânea e compatível com todos os navegadores móveis
-        const maxDimension = targetField === 'avatarUrl' ? 400 : targetField === 'linkThumb' ? 300 : 1200;
-        const compressedDataUrl = await compressImageToDataUrl(file, maxDimension, 0.82);
+        // Converte e comprime a imagem localmente de forma instantânea
+        const maxDimension = targetField === 'avatarUrl' ? 256 : targetField === 'linkThumb' ? 200 : 1000;
+        const compressedDataUrl = await compressImageToDataUrl(file, maxDimension, 0.75);
         const resolvedUrl = compressedDataUrl || URL.createObjectURL(file);
 
-        // Aplica imediatamente para a interface responder em tempo real sem travar o usuário
+        // Aplica imediatamente e persiste via Firestore/LocalStorage no App.tsx
         if (targetField === 'avatarUrl') {
           updateProfile('avatarUrl', resolvedUrl);
         } else if (targetField === 'linkThumb' && linkId) {
           updateLink(linkId, 'thumbnailUrl', resolvedUrl);
         } else {
           updateTheme(targetField as keyof Theme, resolvedUrl);
-        }
-
-        // Opcionalmente tenta enviar ao Firebase Storage se estiver configurado
-        if (isFirebaseConfigured) {
-          try {
-            const fileExt = file.name.split('.').pop() || 'jpg';
-            const fileName = `uploads/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-            const storageRef = ref(storage, fileName);
-            await uploadBytes(storageRef, file);
-            const remoteUrl = await getDownloadURL(storageRef);
-            if (remoteUrl) {
-              if (targetField === 'avatarUrl') updateProfile('avatarUrl', remoteUrl);
-              else if (targetField === 'linkThumb' && linkId) updateLink(linkId, 'thumbnailUrl', remoteUrl);
-              else updateTheme(targetField as keyof Theme, remoteUrl);
-            }
-          } catch (storageErr) {
-            console.warn("Storage upload não configurado ou restrito, mantendo versão comprimida local:", storageErr);
-          }
         }
       } else if (type === 'video') {
         // Quebra em chunks no Firestore para vídeos
