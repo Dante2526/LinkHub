@@ -19,6 +19,8 @@ export interface Theme {
   buttonRadius: ButtonRadius;
   linkFormat: LinkFormat;
   avatarShape: AvatarShape;
+  profileTextColor?: string;
+  linkTextAlign?: 'center' | 'left';
 }
 
 export interface LinkItem {
@@ -29,6 +31,8 @@ export interface LinkItem {
   thumbnailUrl: string;
   isVisible: boolean;
   animation?: LinkAnimation;
+  textColor?: string;
+  buttonColor?: string;
 }
 
 export interface Profile {
@@ -57,6 +61,8 @@ export const defaultTheme: Theme = {
   buttonRadius: 'full',
   linkFormat: 'classic',
   avatarShape: 'round',
+  profileTextColor: '#ffffff',
+  linkTextAlign: 'center',
 };
 
 export const defaultProfile: Profile = {

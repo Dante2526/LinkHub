@@ -234,7 +234,7 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
       <button
         onClick={() => setIsShareModalOpen(true)}
         className="absolute top-6 right-6 p-3 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md shadow-sm border border-white/20 transition-all z-40 group"
-        style={{ color: theme.buttonTextColor }}
+        style={{ color: theme.profileTextColor || '#ffffff' }}
       >
         <Share2 className="w-5 h-5 opacity-80 group-hover:opacity-100" />
       </button>
@@ -267,10 +267,16 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
             </div>
           )}
           
-          <h1 className="text-2xl font-bold mb-2" style={{ color: theme.buttonTextColor }}>
+          <h1 
+            className="text-2xl font-bold mb-2 tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" 
+            style={{ color: theme.profileTextColor || '#ffffff' }}
+          >
             {profile.name}
           </h1>
-          <p className="text-base opacity-90" style={{ color: theme.buttonTextColor }}>
+          <p 
+            className="text-base opacity-95 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" 
+            style={{ color: theme.profileTextColor || '#ffffff' }}
+          >
             {profile.bio}
           </p>
         </motion.div>
@@ -292,59 +298,78 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
         >
           {links.filter(l => l.isVisible).map(link => {
             const format = theme.linkFormat || 'classic';
-            const layoutClass = format === 'featured' ? 'flex flex-col' : format === 'banner' ? 'flex flex-col overflow-hidden' : format === 'compact' ? 'flex items-center p-2' : format === 'minimal' ? 'flex items-center justify-center p-4' : 'flex items-center p-3';
+            const isCentered = (theme.linkTextAlign ?? 'center') === 'center';
+            const linkTextColor = link.textColor || theme.buttonTextColor || '#000000';
+            const linkBgColor = link.buttonColor || theme.buttonColor || '#ffffff';
 
             return (
               <motion.a 
                 onClick={() => onLinkClick?.(link.id)}
                 variants={getAnimationVariants(link.animation)}
-                whileHover={{ scale: 1.03, y: -2 }}
+                whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
                 key={link.id} 
                 href={link.url} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className={`${getButtonStyle(theme)} ${layoutClass}`}
+                className={`${getButtonStyle(theme)} overflow-hidden transition-all`}
                 style={
                   theme.buttonStyle === 'solid' 
-                    ? { backgroundColor: theme.buttonColor, color: theme.buttonTextColor }
+                    ? { backgroundColor: linkBgColor, color: linkTextColor }
                     : theme.buttonStyle === 'outline'
-                      ? { borderColor: theme.buttonColor, color: theme.buttonTextColor }
-                      : { color: theme.buttonTextColor }
+                      ? { borderColor: linkBgColor, color: linkTextColor }
+                      : { color: linkTextColor }
                 }
               >
                 {format === 'featured' ? (
-                  <>
+                  <div className="flex flex-col w-full">
                     {link.thumbnailUrl && (
                       <div className="w-full h-40 bg-black/5 flex-shrink-0">
                         <img src={link.thumbnailUrl} alt="" className="w-full h-full object-cover" />
                       </div>
                     )}
-                    <div className="p-4 w-full text-center">
-                      <div className="font-semibold text-lg">{link.title}</div>
-                      {link.description && <div className="text-sm opacity-80 mt-1">{link.description}</div>}
+                    <div className={`p-4 w-full ${isCentered ? 'text-center' : 'text-left'}`}>
+                      <div className="font-semibold text-lg leading-snug">{link.title}</div>
+                      {link.description && <div className="text-sm opacity-80 mt-1 leading-snug">{link.description}</div>}
                     </div>
-                  </>
+                  </div>
                 ) : format === 'compact' ? (
-                  <>
-                    {link.thumbnailUrl ? (
-                      <img src={link.thumbnailUrl} alt="" className="w-8 h-8 rounded-full object-cover ml-2 mr-3 flex-shrink-0" />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center ml-2 mr-3 flex-shrink-0">
-                        <ExternalLink className="w-4 h-4 opacity-70" />
+                  isCentered ? (
+                    <div className="relative w-full flex items-center justify-center min-h-[46px] py-2 px-3 text-center">
+                      {link.thumbnailUrl ? (
+                        <img src={link.thumbnailUrl} alt="" className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                      ) : (
+                        <div className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/5 flex items-center justify-center flex-shrink-0">
+                          <ExternalLink className="w-4 h-4 opacity-75" style={{ color: linkTextColor }} />
+                        </div>
+                      )}
+                      <div className="w-full px-9 flex flex-col items-center justify-center text-center">
+                        <div className="font-medium text-sm leading-snug break-words">{link.title}</div>
+                        {link.description && <div className="text-xs opacity-80 mt-0.5 leading-snug break-words">{link.description}</div>}
                       </div>
-                    )}
-                    <div className="flex-1 text-left pr-4">
-                      <div className="font-medium text-sm">{link.title}</div>
-                      {link.description && <div className="text-xs opacity-80 mt-0.5">{link.description}</div>}
                     </div>
-                  </>
+                  ) : (
+                    <div className="w-full flex items-center min-h-[46px] py-2 px-3 text-left">
+                      {link.thumbnailUrl ? (
+                        <img src={link.thumbnailUrl} alt="" className="w-8 h-8 rounded-full object-cover ml-1 mr-3 flex-shrink-0" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-black/5 flex items-center justify-center ml-1 mr-3 flex-shrink-0">
+                          <ExternalLink className="w-4 h-4 opacity-75" style={{ color: linkTextColor }} />
+                        </div>
+                      )}
+                      <div className="flex-1 pr-2">
+                        <div className="font-medium text-sm leading-snug break-words">{link.title}</div>
+                        {link.description && <div className="text-xs opacity-80 mt-0.5 leading-snug break-words">{link.description}</div>}
+                      </div>
+                    </div>
+                  )
                 ) : format === 'minimal' ? (
-                  <div className="w-full text-center">
-                    <div className="font-semibold text-lg">{link.title}</div>
+                  <div className={`w-full p-4 ${isCentered ? 'text-center' : 'text-left'}`}>
+                    <div className="font-semibold text-lg leading-snug">{link.title}</div>
+                    {link.description && <div className="text-xs opacity-80 mt-1 leading-snug">{link.description}</div>}
                   </div>
                 ) : format === 'banner' ? (
-                  <div className="w-full relative h-32 flex flex-col justify-end overflow-hidden group-hover:scale-[1.02] transition-transform">
+                  <div className="w-full relative h-32 flex flex-col justify-end overflow-hidden group-hover:scale-[1.01] transition-transform">
                     {link.thumbnailUrl ? (
                       <>
                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent z-10" />
@@ -353,26 +378,44 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
                     ) : (
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/10 z-10" />
                     )}
-                    <div className="relative z-20 p-4 w-full text-left text-white">
+                    <div className={`relative z-20 p-4 w-full ${isCentered ? 'text-center' : 'text-left'} text-white`}>
                       <div className="font-bold text-xl drop-shadow-md">{link.title}</div>
                       {link.description && <div className="text-sm opacity-90 mt-0.5 drop-shadow-md">{link.description}</div>}
                     </div>
                   </div>
                 ) : (
-                  <>
-                    <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-black/5 rounded-full overflow-hidden mr-3">
-                      {link.thumbnailUrl ? (
-                        <img src={link.thumbnailUrl} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <ExternalLink className="w-5 h-5 opacity-70" />
-                      )}
+                  // Formato Classic (Padrão)
+                  isCentered ? (
+                    <div className="relative w-full flex items-center justify-center min-h-[58px] py-3.5 px-4 text-center">
+                      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center bg-black/5 rounded-full overflow-hidden flex-shrink-0">
+                        {link.thumbnailUrl ? (
+                          <img src={link.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <ExternalLink className="w-5 h-5 opacity-75" style={{ color: linkTextColor }} />
+                        )}
+                      </div>
+                      
+                      <div className="w-full px-12 flex flex-col items-center justify-center text-center">
+                        <div className="font-semibold text-base sm:text-lg leading-snug break-words">{link.title}</div>
+                        {link.description && <div className="text-xs sm:text-sm opacity-80 mt-0.5 leading-snug break-words">{link.description}</div>}
+                      </div>
                     </div>
-                    
-                    <div className="flex-1 text-center pr-12">
-                      <div className="font-semibold text-lg">{link.title}</div>
-                      {link.description && <div className="text-sm opacity-80 mt-0.5">{link.description}</div>}
+                  ) : (
+                    <div className="w-full flex items-center min-h-[58px] py-3.5 px-4 text-left">
+                      <div className="flex-shrink-0 w-11 h-11 flex items-center justify-center bg-black/5 rounded-full overflow-hidden mr-3.5">
+                        {link.thumbnailUrl ? (
+                          <img src={link.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <ExternalLink className="w-5 h-5 opacity-75" style={{ color: linkTextColor }} />
+                        )}
+                      </div>
+                      
+                      <div className="flex-1">
+                        <div className="font-semibold text-base sm:text-lg leading-snug break-words">{link.title}</div>
+                        {link.description && <div className="text-xs sm:text-sm opacity-80 mt-0.5 leading-snug break-words">{link.description}</div>}
+                      </div>
                     </div>
-                  </>
+                  )
                 )}
               </motion.a>
             );

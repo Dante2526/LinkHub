@@ -15,7 +15,12 @@ const getInitialData = (): AppData | null => {
   try {
     const cached = localStorage.getItem(CACHE_KEY);
     if (cached) {
-      return JSON.parse(cached);
+      const parsed = JSON.parse(cached);
+      if (parsed?.theme) {
+        if (!parsed.theme.profileTextColor) parsed.theme.profileTextColor = '#ffffff';
+        if (!parsed.theme.linkTextAlign) parsed.theme.linkTextAlign = 'center';
+      }
+      return parsed;
     }
   } catch (e) {
     console.error('Erro ao ler cache local', e);
@@ -150,6 +155,15 @@ export default function App() {
       const unsubscribe = onSnapshot(docRef, (snapshot) => {
         if (snapshot.exists()) {
           const fetchedData = snapshot.data() as AppData;
+          if (!fetchedData.theme) {
+            fetchedData.theme = { ...defaultTheme };
+          }
+          if (!fetchedData.theme.profileTextColor) {
+            fetchedData.theme.profileTextColor = '#ffffff';
+          }
+          if (!fetchedData.theme.linkTextAlign) {
+            fetchedData.theme.linkTextAlign = 'center';
+          }
           setData(fetchedData);
           try {
             localStorage.setItem(CACHE_KEY, JSON.stringify(fetchedData));

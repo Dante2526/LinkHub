@@ -2,9 +2,91 @@ import React, { useState, useEffect, useRef } from 'react';
 import { AppData, LinkItem, Theme } from '../types';
 import { GripVertical, Plus, Trash2, Image as ImageIcon, Video, Palette, Link as LinkIcon, User, Camera, BarChart3, MousePointerClick, Clock, Calendar, Eye, Loader2, Upload } from 'lucide-react';
 import { ColorPicker } from './ColorPicker';
+import { CustomSelect, SelectOption } from './CustomSelect';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, getCountFromServer, getDocs, query, orderBy, limit, setDoc, doc } from 'firebase/firestore';
 import { db, storage, isFirebaseConfigured } from '../lib/firebase';
+
+const BACKGROUND_TYPE_OPTIONS: SelectOption[] = [
+  { value: 'color', label: 'Cor Sólida', subtitle: 'Cor única de fundo' },
+  { value: 'gradient', label: 'Gradiente Estático', subtitle: 'Degradê suave entre duas cores' },
+  { value: 'animated-gradient', label: 'Gradiente Animado', subtitle: 'Degradê pulsante com movimento' },
+  { value: 'image', label: 'Imagem', subtitle: 'Upload do aparelho ou link URL' },
+  { value: 'video', label: 'Vídeo', subtitle: 'Vídeo dinâmico de fundo em loop' },
+];
+
+const BUTTON_RADIUS_OPTIONS: SelectOption[] = [
+  { 
+    value: 'none', 
+    label: 'Reto (Sem borda)', 
+    subtitle: 'Cantos retos sem arredondamento',
+    preview: <span className="w-5 h-5 bg-blue-600 rounded-none inline-block border border-blue-400" /> 
+  },
+  { 
+    value: 'sm', 
+    label: 'Suave', 
+    subtitle: 'Arredondamento sutil de 4px',
+    preview: <span className="w-5 h-5 bg-blue-600 rounded-sm inline-block border border-blue-400" /> 
+  },
+  { 
+    value: 'md', 
+    label: 'Médio', 
+    subtitle: 'Arredondamento padrão de 8px',
+    preview: <span className="w-5 h-5 bg-blue-600 rounded-md inline-block border border-blue-400" /> 
+  },
+  { 
+    value: 'lg', 
+    label: 'Grande', 
+    subtitle: 'Bordas curvas de 12px',
+    preview: <span className="w-5 h-5 bg-blue-600 rounded-lg inline-block border border-blue-400" /> 
+  },
+  { 
+    value: 'xl', 
+    label: 'Super Redondo', 
+    subtitle: 'Bordas bem acentuadas de 16px',
+    preview: <span className="w-5 h-5 bg-blue-600 rounded-2xl inline-block border border-blue-400" /> 
+  },
+  { 
+    value: 'full', 
+    label: 'Pílula', 
+    subtitle: 'Totalmente circular nas extremidades',
+    preview: <span className="w-7 h-4 bg-blue-600 rounded-full inline-block border border-blue-400" /> 
+  },
+  { 
+    value: 'leaf', 
+    label: 'Folha (Assimétrico)', 
+    subtitle: 'Design assimétrico exclusivo',
+    preview: <span className="w-5 h-5 bg-blue-600 rounded-tl-xl rounded-br-xl inline-block border border-blue-400" /> 
+  },
+];
+
+const FONT_FAMILY_OPTIONS: SelectOption[] = [
+  { 
+    value: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif", 
+    label: 'Sistema (Padrão Samsung / Apple)',
+    subtitle: 'Rápido, nativo e super legível'
+  },
+  { 
+    value: 'Inter, sans-serif', 
+    label: 'Inter',
+    subtitle: 'Moderno, limpo e profissional'
+  },
+  { 
+    value: 'ui-serif, Georgia, serif', 
+    label: 'Serifa Clássica',
+    subtitle: 'Elegante e tradicional'
+  },
+  { 
+    value: 'ui-monospace, SFMono-Regular, monospace', 
+    label: 'Monospace',
+    subtitle: 'Estilo código e terminal'
+  },
+  { 
+    value: "'Comic Sans MS', cursive, sans-serif", 
+    label: 'Divertida / Casual',
+    subtitle: 'Descontraído e informal'
+  },
+];
 
 interface EditorProps {
   data: AppData;
@@ -296,7 +378,149 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
               <Plus className="w-5 h-5" /> Adicionar Link
             </button>
             
-            <div className="space-y-4 mt-6">
+            {/* Controles de Aparência dos Cartões de Links */}
+            <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 space-y-4">
+              <div className="flex items-center justify-between pb-1 border-b border-gray-100">
+                <span className="text-sm font-bold text-gray-900">Aparência dos Cartões de Links</span>
+                <span className="text-xs text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full font-semibold">Geral</span>
+              </div>
+
+              {/* Alinhamento do Texto */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block">Alinhamento do Texto</label>
+                <div className="grid grid-cols-2 gap-2 bg-gray-100 p-1 rounded-2xl">
+                  <button
+                    type="button"
+                    onClick={() => updateTheme('linkTextAlign', 'center')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                      (data.theme.linkTextAlign ?? 'center') === 'center'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    Centralizado (Padrão)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateTheme('linkTextAlign', 'left')}
+                    className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                      data.theme.linkTextAlign === 'left'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    À Esquerda
+                  </button>
+                </div>
+              </div>
+
+              {/* Cor do Texto nos Cartões */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block">Cor do Texto dos Cartões</label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <ColorPicker 
+                    color={data.theme.buttonTextColor || '#000000'}
+                    onChange={(color) => updateTheme('buttonTextColor', color)}
+                    className="w-10 h-10 flex-shrink-0"
+                  />
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => updateTheme('buttonTextColor', '#000000')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                        (data.theme.buttonTextColor || '#000000').toLowerCase() === '#000000'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : 'bg-gray-100 text-gray-700 border-transparent hover:bg-gray-200'
+                      }`}
+                    >
+                      Preto
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateTheme('buttonTextColor', '#ffffff')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                        data.theme.buttonTextColor?.toLowerCase() === '#ffffff'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : 'bg-gray-100 text-gray-700 border-transparent hover:bg-gray-200'
+                      }`}
+                    >
+                      Branco
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateTheme('buttonTextColor', '#1f2937')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                        data.theme.buttonTextColor?.toLowerCase() === '#1f2937'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : 'bg-gray-100 text-gray-700 border-transparent hover:bg-gray-200'
+                      }`}
+                    >
+                      Grafite
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateTheme('buttonTextColor', '#2563eb')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                        data.theme.buttonTextColor?.toLowerCase() === '#2563eb'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : 'bg-gray-100 text-gray-700 border-transparent hover:bg-gray-200'
+                      }`}
+                    >
+                      Azul
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cor de Fundo dos Cartões */}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block">Cor de Fundo dos Cartões</label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <ColorPicker 
+                    color={data.theme.buttonColor || '#ffffff'}
+                    onChange={(color) => updateTheme('buttonColor', color)}
+                    className="w-10 h-10 flex-shrink-0"
+                  />
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => updateTheme('buttonColor', '#ffffff')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                        (data.theme.buttonColor || '#ffffff').toLowerCase() === '#ffffff'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : 'bg-gray-100 text-gray-700 border-transparent hover:bg-gray-200'
+                      }`}
+                    >
+                      Branco
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateTheme('buttonColor', '#18181b')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                        data.theme.buttonColor?.toLowerCase() === '#18181b'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : 'bg-gray-100 text-gray-700 border-transparent hover:bg-gray-200'
+                      }`}
+                    >
+                      Escuro
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateTheme('buttonColor', '#f3f4f6')}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                        data.theme.buttonColor?.toLowerCase() === '#f3f4f6'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : 'bg-gray-100 text-gray-700 border-transparent hover:bg-gray-200'
+                      }`}
+                    >
+                      Cinza Claro
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-4 mt-2">
               {data.links.map((link, index) => (
                 <div key={link.id} className="bg-white rounded-3xl py-5 px-10 sm:px-12 shadow-sm border border-gray-100 relative transition-all flex justify-center">
                   <div className="absolute left-1 sm:left-4 top-0 bottom-0 flex flex-col items-center justify-center gap-2 text-gray-300 w-8">
@@ -397,6 +621,42 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                       >
                         <Trash2 className="w-5 h-5" />
                       </button>
+                    </div>
+
+                    {/* Personalizar cores deste link individual */}
+                    <div className="pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+                      <span className="font-medium text-[11px]">Cores deste link:</span>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5" title="Cor do texto deste link">
+                          <span className="text-[10px] text-gray-400">Texto</span>
+                          <ColorPicker 
+                            color={link.textColor || data.theme.buttonTextColor || '#000000'}
+                            onChange={(color) => updateLink(link.id, 'textColor', color)}
+                            className="w-7 h-7"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1.5" title="Cor do fundo deste link">
+                          <span className="text-[10px] text-gray-400">Fundo</span>
+                          <ColorPicker 
+                            color={link.buttonColor || data.theme.buttonColor || '#ffffff'}
+                            onChange={(color) => updateLink(link.id, 'buttonColor', color)}
+                            className="w-7 h-7"
+                          />
+                        </div>
+                        {(link.textColor || link.buttonColor) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateLink(link.id, 'textColor', undefined);
+                              updateLink(link.id, 'buttonColor', undefined);
+                            }}
+                            className="text-[10px] text-blue-600 hover:underline ml-1"
+                            title="Usar cor padrão dos cartões"
+                          >
+                            Resetar
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -530,6 +790,41 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                   className="w-full bg-gray-100 border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-gray-200/70 focus:ring-2 focus:ring-blue-500/20 resize-none transition-all"
                 />
               </div>
+
+              <div className="space-y-3 pt-1">
+                <label className="text-sm font-bold text-gray-900 block">Cor do Texto (Nome e Bio)</label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <ColorPicker 
+                    color={data.theme.profileTextColor || '#ffffff'}
+                    onChange={(color) => updateTheme('profileTextColor', color)}
+                    className="w-10 h-10 flex-shrink-0"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => updateTheme('profileTextColor', '#ffffff')}
+                      className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                        (data.theme.profileTextColor || '#ffffff').toLowerCase() === '#ffffff'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : 'bg-gray-100 text-gray-700 border-transparent hover:bg-gray-200'
+                      }`}
+                    >
+                      Branco (Recomendado)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateTheme('profileTextColor', '#000000')}
+                      className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                        data.theme.profileTextColor?.toLowerCase() === '#000000'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : 'bg-gray-100 text-gray-700 border-transparent hover:bg-gray-200'
+                      }`}
+                    >
+                      Preto
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -540,17 +835,11 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
               <h3 className="text-lg font-bold text-gray-900 mb-2">Fundo</h3>
               
               <div className="space-y-3">
-                <select 
+                <CustomSelect 
                   value={data.theme.backgroundType}
-                  onChange={(e) => updateTheme('backgroundType', e.target.value)}
-                  className="w-full text-center bg-gray-100 border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                >
-                  <option value="color">Cor Sólida</option>
-                  <option value="gradient">Gradiente Estático</option>
-                  <option value="animated-gradient">Gradiente Animado</option>
-                  <option value="image">Imagem (URL)</option>
-                  <option value="video">Vídeo (URL)</option>
-                </select>
+                  onChange={(val) => updateTheme('backgroundType', val)}
+                  options={BACKGROUND_TYPE_OPTIONS}
+                />
 
                 {data.theme.backgroundType === 'color' && (
                   <div className="flex items-center justify-center gap-3 pt-2">
@@ -718,44 +1007,146 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                   >Vidro</button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                {/* Alinhamento do texto dos links */}
+                <div className="space-y-1.5 pt-1 text-left">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block text-center">Alinhamento do Texto nos Cartões</label>
+                  <div className="grid grid-cols-2 gap-2 bg-gray-100 p-1 rounded-2xl">
+                    <button
+                      type="button"
+                      onClick={() => updateTheme('linkTextAlign', 'center')}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                        (data.theme.linkTextAlign ?? 'center') === 'center'
+                          ? 'bg-white text-blue-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      Centralizado (Padrão)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateTheme('linkTextAlign', 'left')}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                        data.theme.linkTextAlign === 'left'
+                          ? 'bg-white text-blue-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      À Esquerda
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block text-center">Cor de Fundo</label>
-                    <div className="flex items-center justify-center gap-2">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block text-center">Fundo dos Botões</label>
+                    <div className="flex flex-col items-center gap-2">
                       <ColorPicker 
-                        color={data.theme.buttonColor}
+                        color={data.theme.buttonColor || '#ffffff'}
                         onChange={(color) => updateTheme('buttonColor', color)}
                         className="w-10 h-10 flex-shrink-0"
                       />
+                      <div className="flex flex-wrap justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => updateTheme('buttonColor', '#ffffff')}
+                          className="px-2 py-1 text-[11px] font-semibold bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700"
+                        >
+                          Branco
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateTheme('buttonColor', '#18181b')}
+                          className="px-2 py-1 text-[11px] font-semibold bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700"
+                        >
+                          Escuro
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateTheme('buttonColor', '#f3f4f6')}
+                          className="px-2 py-1 text-[11px] font-semibold bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700"
+                        >
+                          Cinza
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block text-center">Cor do Texto</label>
-                    <div className="flex items-center justify-center gap-2">
+                    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block text-center">Texto dos Botões</label>
+                    <div className="flex flex-col items-center gap-2">
                       <ColorPicker 
-                        color={data.theme.buttonTextColor}
+                        color={data.theme.buttonTextColor || '#000000'}
                         onChange={(color) => updateTheme('buttonTextColor', color)}
                         className="w-10 h-10 flex-shrink-0"
                       />
+                      <div className="flex flex-wrap justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => updateTheme('buttonTextColor', '#000000')}
+                          className="px-2 py-1 text-[11px] font-semibold bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700"
+                        >
+                          Preto
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateTheme('buttonTextColor', '#ffffff')}
+                          className="px-2 py-1 text-[11px] font-semibold bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700"
+                        >
+                          Branco
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateTheme('buttonTextColor', '#1f2937')}
+                          className="px-2 py-1 text-[11px] font-semibold bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700"
+                        >
+                          Grafite
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-2 pt-2">
+                <div className="space-y-2 pt-2 border-t border-gray-100">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block text-center">Cor do Nome e Bio</label>
+                  <div className="flex items-center justify-center gap-3">
+                    <ColorPicker 
+                      color={data.theme.profileTextColor || '#ffffff'}
+                      onChange={(color) => updateTheme('profileTextColor', color)}
+                      className="w-10 h-10 flex-shrink-0"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => updateTheme('profileTextColor', '#ffffff')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                          (data.theme.profileTextColor || '#ffffff').toLowerCase() === '#ffffff'
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                            : 'bg-gray-100 text-gray-700 border-transparent hover:bg-gray-200'
+                        }`}
+                      >
+                        Branco
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateTheme('profileTextColor', '#000000')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                          data.theme.profileTextColor?.toLowerCase() === '#000000'
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                            : 'bg-gray-100 text-gray-700 border-transparent hover:bg-gray-200'
+                        }`}
+                      >
+                        Preto
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-2 text-left">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block text-center">Arredondamento</label>
-                  <select 
+                  <CustomSelect 
                     value={data.theme.buttonRadius}
-                    onChange={(e) => updateTheme('buttonRadius', e.target.value)}
-                    className="w-full text-center bg-gray-100 border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  >
-                    <option value="none">Reto (Sem borda)</option>
-                    <option value="sm">Suave</option>
-                    <option value="md">Médio</option>
-                    <option value="lg">Grande</option>
-                    <option value="xl">Super Redondo</option>
-                    <option value="full">Pílula</option>
-                    <option value="leaf">Folha (Assimétrico)</option>
-                  </select>
+                    onChange={(val) => updateTheme('buttonRadius', val)}
+                    options={BUTTON_RADIUS_OPTIONS}
+                  />
                 </div>
 
                 <div className="pt-2 flex justify-center">
@@ -777,17 +1168,13 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
             
             <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-4 text-center">
                <h3 className="text-lg font-bold text-gray-900 mb-2">Tipografia</h3>
-               <select 
-                  value={data.theme.fontFamily}
-                  onChange={(e) => updateTheme('fontFamily', e.target.value)}
-                  className="w-full text-center bg-gray-100 border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-               >
-                  <option value="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">Sistema (Padrão Samsung/Apple)</option>
-                  <option value="Inter, sans-serif">Inter</option>
-                  <option value="ui-serif, Georgia, serif">Serifa Clássica</option>
-                  <option value="ui-monospace, SFMono-Regular, monospace">Monospace</option>
-                  <option value="'Comic Sans MS', cursive, sans-serif">Divertida</option>
-               </select>
+               <div className="text-left">
+                 <CustomSelect 
+                    value={data.theme.fontFamily}
+                    onChange={(val) => updateTheme('fontFamily', val)}
+                    options={FONT_FAMILY_OPTIONS}
+                 />
+               </div>
             </div>
           </div>
         )}
