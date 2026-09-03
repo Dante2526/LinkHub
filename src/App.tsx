@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { doc, onSnapshot, setDoc, collection, addDoc } from 'firebase/firestore';
-import { db } from './lib/firebase';
+import { db, isFirebaseConfigured } from './lib/firebase';
 import { AppData, defaultTheme, defaultProfile, defaultLinks } from './types';
 import { Editor } from './components/Editor';
 import { Preview } from './components/Preview';
@@ -9,6 +9,19 @@ import { Login } from './components/Login';
 import { Smartphone, Monitor, ExternalLink } from 'lucide-react';
 
 const STORAGE_KEY = 'link-organizer-data';
+const CACHE_KEY = 'linkhub_cached_profile';
+
+const getInitialData = (): AppData | null => {
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (e) {
+    console.error('Erro ao ler cache local', e);
+  }
+  return null;
+};
 
 const MemoizedEditor = React.memo(Editor);
 const MemoizedPreview = React.memo(Preview);
@@ -78,13 +91,13 @@ function AdminView({ data, setData, onLinkClick }: { data: AppData, setData: (d:
         </div>
 
         {/* Preview Area */}
-        <div className="flex-1 overflow-hidden flex items-center justify-center p-8">
+        <div className="flex-1 overflow-hidden flex items-center justify-center p-4 sm:p-8 isolate">
           <div 
             className={`
-              relative overflow-hidden transition-all duration-500 ease-in-out shadow-lg shrink-0
+              relative overflow-hidden transition-all duration-500 ease-in-out shadow-2xl shrink-0
               ${previewMode === 'mobile' 
-                ? 'h-full max-h-[720px] aspect-[9/19] rounded-[2.5rem] border-[12px] border-black' 
-                : 'w-full h-full max-w-5xl rounded-3xl border border-gray-200'
+                ? 'h-full max-h-[720px] aspect-[9/19] rounded-[2.5rem] border-[12px] border-black bg-black' 
+                : 'w-full h-full max-w-5xl rounded-3xl border border-gray-300 bg-white'
               }
             `}
           >
@@ -118,41 +131,83 @@ function PublicView({ data, onLinkClick, onView }: { data: AppData, onLinkClick:
 }
 
 export default function App() {
-  const [data, setData] = useState<AppData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<AppData | null>(getInitialData);
+  const [loading, setLoading] = useState<boolean>(() => !getInitialData());
   const [adminEmail, setAdminEmail] = useState<string | null>(localStorage.getItem('linkhub_admin_email'));
 
   useEffect(() => {
-    const docRef = doc(db, 'perfis', 'principal');
-    const unsubscribe = onSnapshot(docRef, (snapshot) => {
-      if (snapshot.exists()) {
-        setData(snapshot.data() as AppData);
-      } else {
-        const defaultData = { profile: defaultProfile, theme: defaultTheme, links: defaultLinks };
-        setDoc(docRef, defaultData);
+    if (!isFirebaseConfigured) {
+      if (!data) {
+        const defaultData = getInitialData() || { profile: defaultProfile, theme: defaultTheme, links: defaultLinks };
+        setData(defaultData);
       }
       setLoading(false);
-    });
-    return () => unsubscribe();
+      return;
+    }
+
+    try {
+      const docRef = doc(db, 'perfis', 'principal');
+      const unsubscribe = onSnapshot(docRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const fetchedData = snapshot.data() as AppData;
+          setData(fetchedData);
+          try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify(fetchedData));
+          } catch (e) {
+            console.error("Erro ao salvar cache", e);
+          }
+        } else {
+          const defaultData = { profile: defaultProfile, theme: defaultTheme, links: defaultLinks };
+          setDoc(docRef, defaultData).catch(console.error);
+          setData(defaultData);
+          try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify(defaultData));
+          } catch (e) {}
+        }
+        setLoading(false);
+      }, (error) => {
+        console.error("Erro no onSnapshot do Firestore:", error);
+        if (!data) {
+          setData(getInitialData() || { profile: defaultProfile, theme: defaultTheme, links: defaultLinks });
+        }
+        setLoading(false);
+      });
+      return () => unsubscribe();
+    } catch (err) {
+      console.error("Erro ao conectar no Firestore:", err);
+      if (!data) {
+        setData(getInitialData() || { profile: defaultProfile, theme: defaultTheme, links: defaultLinks });
+      }
+      setLoading(false);
+    }
   }, []);
 
   const handleUpdateData = useCallback((updater: AppData | ((prev: AppData) => AppData)) => {
     setData(prev => {
       if (!prev) return prev;
       const newData = typeof updater === 'function' ? updater(prev) : updater;
-      setDoc(doc(db, 'perfis', 'principal'), newData);
+      if (isFirebaseConfigured) {
+        setDoc(doc(db, 'perfis', 'principal'), newData).catch(console.error);
+      }
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(newData));
+      } catch (e) {}
       return newData;
     });
   }, []);
 
   const handleLinkClick = useCallback((linkId: string) => {
-    addDoc(collection(db, 'cliques'), { linkId, time: Date.now() }).catch(console.error);
+    if (isFirebaseConfigured) {
+      addDoc(collection(db, 'cliques'), { linkId, time: Date.now() }).catch(console.error);
+    }
   }, []);
 
   const handleView = useCallback(() => {
     const hasViewed = sessionStorage.getItem('linkhub_has_viewed');
     if (!hasViewed) {
-      addDoc(collection(db, 'visualizacoes'), { time: Date.now() }).catch(console.error);
+      if (isFirebaseConfigured) {
+        addDoc(collection(db, 'visualizacoes'), { time: Date.now() }).catch(console.error);
+      }
       sessionStorage.setItem('linkhub_has_viewed', 'true');
     }
   }, []);
@@ -173,10 +228,10 @@ export default function App() {
 
   if (loading || !data) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-[#f2f2f2]">
-        <div className="animate-pulse flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-full border-4 border-blue-600 border-t-transparent animate-spin"></div>
-          <p className="text-gray-600 font-medium tracking-tight">Sincronizando com a Nuvem...</p>
+      <div className="flex h-screen w-full items-center justify-center bg-gray-900 text-white">
+        <div className="flex flex-col items-center gap-4 animate-pulse">
+          <div className="w-10 h-10 rounded-full border-3 border-blue-500 border-t-transparent animate-spin"></div>
+          <p className="text-gray-400 text-sm font-medium tracking-wide">Carregando perfil...</p>
         </div>
       </div>
     );

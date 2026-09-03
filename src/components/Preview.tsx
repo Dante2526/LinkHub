@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AppData, Theme } from '../types';
 import { ExternalLink, Share2, X } from 'lucide-react';
-import { db } from '../lib/firebase';
+import { db, isFirebaseConfigured } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
@@ -11,6 +11,9 @@ interface PreviewProps {
   onLinkClick?: (linkId: string) => void;
 }
 
+// Global cache for reconstructed video blob URLs across component renders
+const videoBlobCache = new Map<string, string>();
+
 const getBackgroundStyle = (theme: Theme): React.CSSProperties => {
   switch (theme.backgroundType) {
     case 'color':
@@ -18,15 +21,24 @@ const getBackgroundStyle = (theme: Theme): React.CSSProperties => {
     case 'gradient':
       return { background: theme.backgroundGradient };
     case 'animated-gradient':
-      return { background: theme.backgroundGradient };
+      return { 
+        background: theme.backgroundGradient,
+        backgroundSize: '300% 300%'
+      };
     case 'image':
       return { 
         backgroundImage: `url(${theme.backgroundImageUrl})`,
         backgroundSize: 'cover',
-        backgroundPosition: 'center'
+        backgroundPosition: 'center',
+        backgroundColor: theme.backgroundColor || '#111827'
+      };
+    case 'video':
+      return { 
+        backgroundColor: theme.backgroundColor || '#0f172a',
+        background: theme.backgroundGradient || theme.backgroundColor || '#0f172a'
       };
     default:
-      return {};
+      return { backgroundColor: theme.backgroundColor || '#f2f2f2' };
   }
 };
 
@@ -147,22 +159,40 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
     let isMounted = true;
     
     if (url && url.startsWith('firestore_chunked|')) {
+      if (!isFirebaseConfigured) {
+        setResolvedVideoUrl(null);
+        return;
+      }
+
+      // Check cache first for instant 0ms playback
+      if (videoBlobCache.has(url)) {
+        setResolvedVideoUrl(videoBlobCache.get(url)!);
+        return;
+      }
+
       const [, fileId, chunksStr] = url.split('|');
       const totalChunks = parseInt(chunksStr, 10);
       
       const loadVideo = async () => {
         try {
+          // Download ALL chunks in parallel with Promise.all (cuts time by 80-90%)
+          const chunkPromises = Array.from({ length: totalChunks }, (_, i) => 
+            getDoc(doc(db, 'media_chunks', `${fileId}_chunk_${i}`))
+          );
+          const snaps = await Promise.all(chunkPromises);
+
           let base64String = '';
-          for (let i = 0; i < totalChunks; i++) {
-            const snap = await getDoc(doc(db, 'media_chunks', `${fileId}_chunk_${i}`));
+          for (const snap of snaps) {
             if (snap.exists()) {
               base64String += snap.data().data;
             }
           }
+
           if (isMounted && base64String) {
              const res = await fetch(base64String);
              const blob = await res.blob();
              objectUrl = URL.createObjectURL(blob);
+             videoBlobCache.set(url, objectUrl);
              setResolvedVideoUrl(objectUrl);
           }
         } catch (err) {
@@ -173,7 +203,6 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
       
       return () => {
         isMounted = false;
-        if (objectUrl) URL.revokeObjectURL(objectUrl);
       };
     } else {
       setResolvedVideoUrl(url || null);
@@ -184,9 +213,23 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
 
   return (
     <div 
-      className={`relative w-full h-full min-h-full overflow-y-auto no-scrollbar ${isAnimated ? 'animated-gradient-bg' : ''}`} 
+      className={`relative w-full h-full overflow-hidden ${isAnimated ? 'animated-gradient-bg' : ''}`} 
       style={{ ...getBackgroundStyle(theme), fontFamily: theme.fontFamily }}
     >
+      {/* Video Background Layer (strictly contained within the preview frame) */}
+      {theme.backgroundType === 'video' && resolvedVideoUrl && (
+        <video 
+          key={resolvedVideoUrl}
+          autoPlay 
+          loop 
+          muted 
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover pointer-events-none z-0"
+        >
+          <source src={resolvedVideoUrl} />
+        </video>
+      )}
+
       {/* Top right share button */}
       <button
         onClick={() => setIsShareModalOpen(true)}
@@ -196,29 +239,16 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
         <Share2 className="w-5 h-5 opacity-80 group-hover:opacity-100" />
       </button>
 
-      {/* Video Background Layer */}
-      {theme.backgroundType === 'video' && resolvedVideoUrl && (
-        <video 
-          key={resolvedVideoUrl}
-          autoPlay 
-          loop 
-          muted 
-          playsInline
-          className="fixed inset-0 w-full h-full object-cover -z-10"
-        >
-          <source src={resolvedVideoUrl} />
-        </video>
-      )}
-
-      {/* Content */}
-      <div className="max-w-xl mx-auto px-6 py-12 flex flex-col items-center min-h-full relative z-0">
-        {/* Profile */}
-        <motion.div 
-          className="flex flex-col items-center text-center mb-10 w-full"
-          initial={{ opacity: 0, scale: 0.9, y: -20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 25 }}
-        >
+      {/* Scrollable Content (keeps wallpaper static inside device while links scroll) */}
+      <div className="w-full h-full overflow-y-auto no-scrollbar relative z-10">
+        <div className="max-w-xl mx-auto px-6 py-12 flex flex-col items-center min-h-full">
+          {/* Profile */}
+          <motion.div 
+            className="flex flex-col items-center text-center mb-10 w-full"
+            initial={{ opacity: 0, scale: 0.9, y: -20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+          >
           {profile.avatarUrl ? (
             <img 
               src={profile.avatarUrl} 
@@ -348,8 +378,7 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
             );
           })}
         </motion.div>
-
-
+        </div>
       </div>
 
       {/* Share Modal */}

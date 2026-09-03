@@ -5,7 +5,7 @@ import { ColorPicker } from './ColorPicker';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, getCountFromServer, getDocs, query, orderBy, limit, setDoc, doc } from 'firebase/firestore';
 import imageCompression from 'browser-image-compression';
-import { db, storage } from '../lib/firebase';
+import { db, storage, isFirebaseConfigured } from '../lib/firebase';
 
 interface EditorProps {
   data: AppData;
@@ -23,6 +23,17 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
     if (activeTab === 'stats') {
       const fetchMetrics = async () => {
         setLoadingMetrics(true);
+        if (!isFirebaseConfigured) {
+          setMetrics({
+            views: 0,
+            clicks: 0,
+            clicksByLink: {},
+            bestHour: '--',
+            bestDay: '--'
+          });
+          setLoadingMetrics(false);
+          return;
+        }
         try {
           const viewsSnap = await getCountFromServer(collection(db, 'visualizacoes'));
           const clicksSnap = await getCountFromServer(collection(db, 'cliques'));
