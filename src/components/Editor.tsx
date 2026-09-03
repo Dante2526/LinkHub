@@ -4,7 +4,6 @@ import { GripVertical, Plus, Trash2, Image as ImageIcon, Video, Palette, Link as
 import { ColorPicker } from './ColorPicker';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, getCountFromServer, getDocs, query, orderBy, limit, setDoc, doc } from 'firebase/firestore';
-import imageCompression from 'browser-image-compression';
 import { db, storage, isFirebaseConfigured } from '../lib/firebase';
 
 interface EditorProps {
