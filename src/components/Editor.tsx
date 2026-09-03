@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AppData, LinkItem, Theme } from '../types';
 import { GripVertical, Plus, Trash2, Image as ImageIcon, Video, Palette, Link as LinkIcon, User, Camera, BarChart3, MousePointerClick, Clock, Calendar, Eye, Loader2, Upload } from 'lucide-react';
 import { ColorPicker } from './ColorPicker';
@@ -18,6 +18,46 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [metrics, setMetrics] = useState({ views: 0, clicks: 0, clicksByLink: {} as Record<string, number>, bestDay: '--', bestHour: '--' });
   const [loadingMetrics, setLoadingMetrics] = useState(false);
+
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
+  const bgImageInputRef = useRef<HTMLInputElement>(null);
+  const bgVideoInputRef = useRef<HTMLInputElement>(null);
+
+  // Helper nativo e ultrarrápido para comprimir imagem no dispositivo sem depender de web workers
+  const compressImageToDataUrl = (file: File, maxDimension = 600, quality = 0.82): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (readerEvent) => {
+        const img = new Image();
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          } else {
+            resolve((readerEvent.target?.result as string) || '');
+          }
+        };
+        img.onerror = () => resolve((readerEvent.target?.result as string) || '');
+        img.src = (readerEvent.target?.result as string) || '';
+      };
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+  };
 
   useEffect(() => {
     if (activeTab === 'stats') {
@@ -110,27 +150,53 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
 
     if (type === 'video' && file.size > 5 * 1024 * 1024) {
       alert("O arquivo é muito grande. O limite para vídeos/GIFs é de 5MB.");
+      e.target.value = '';
       return;
     }
 
     const uploadKey = linkId ? `${targetField}-${linkId}` : targetField;
     setUploadingState(prev => ({ ...prev, [uploadKey]: true }));
     try {
-      let fileToUpload: File | Blob = file;
-      
-      // Apenas comprime se for realmente uma imagem (evita travar se o usuário forçar um MP4 no input de imagem)
-      if (type === 'image' && file.type.startsWith('image/')) {
-        const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
-        fileToUpload = await imageCompression(file, options);
-      } else if (type === 'image' && !file.type.startsWith('image/')) {
-        alert("Por favor, selecione um arquivo de imagem válido.");
-        setUploadingState(prev => ({ ...prev, [uploadKey]: false }));
-        return;
-      }
+      if (type === 'image') {
+        if (!file.type.startsWith('image/')) {
+          alert("Por favor, selecione um arquivo de imagem válido (PNG, JPG, WEBP, GIF).");
+          setUploadingState(prev => ({ ...prev, [uploadKey]: false }));
+          e.target.value = '';
+          return;
+        }
 
-      let url = "";
+        // Comprime a imagem de forma instantânea e compatível com todos os navegadores móveis
+        const maxDimension = targetField === 'avatarUrl' ? 400 : targetField === 'linkThumb' ? 300 : 1200;
+        const compressedDataUrl = await compressImageToDataUrl(file, maxDimension, 0.82);
+        const resolvedUrl = compressedDataUrl || URL.createObjectURL(file);
 
-      if (type === 'video') {
+        // Aplica imediatamente para a interface responder em tempo real sem travar o usuário
+        if (targetField === 'avatarUrl') {
+          updateProfile('avatarUrl', resolvedUrl);
+        } else if (targetField === 'linkThumb' && linkId) {
+          updateLink(linkId, 'thumbnailUrl', resolvedUrl);
+        } else {
+          updateTheme(targetField as keyof Theme, resolvedUrl);
+        }
+
+        // Opcionalmente tenta enviar ao Firebase Storage se estiver configurado
+        if (isFirebaseConfigured) {
+          try {
+            const fileExt = file.name.split('.').pop() || 'jpg';
+            const fileName = `uploads/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+            const storageRef = ref(storage, fileName);
+            await uploadBytes(storageRef, file);
+            const remoteUrl = await getDownloadURL(storageRef);
+            if (remoteUrl) {
+              if (targetField === 'avatarUrl') updateProfile('avatarUrl', remoteUrl);
+              else if (targetField === 'linkThumb' && linkId) updateLink(linkId, 'thumbnailUrl', remoteUrl);
+              else updateTheme(targetField as keyof Theme, remoteUrl);
+            }
+          } catch (storageErr) {
+            console.warn("Storage upload não configurado ou restrito, mantendo versão comprimida local:", storageErr);
+          }
+        }
+      } else if (type === 'video') {
         // Quebra em chunks no Firestore para vídeos
         const base64String = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
@@ -140,7 +206,7 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
         });
 
         // Base64 tem ~33% overhead: 600KB de chars → ~450KB de binário real → seguro abaixo de 1MB por doc
-        const chunkSize = 600 * 1024; // caracteres, NÃO bytes de arquivo
+        const chunkSize = 600 * 1024;
         const totalChunks = Math.ceil(base64String.length / chunkSize);
         const fileId = `vid_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
@@ -154,28 +220,16 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
           setUploadProgress(prev => ({ ...prev, [uploadKey]: Math.round(((i + 1) / totalChunks) * 100) }));
         }
         
-        url = `firestore_chunked|${fileId}|${totalChunks}`;
-      } else {
-        // Fluxo normal via Firebase Storage para imagens
-        const fileExt = file.name.split('.').pop();
-        const fileName = `uploads/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
-        const storageRef = ref(storage, fileName);
-        
-        await uploadBytes(storageRef, fileToUpload);
-        url = await getDownloadURL(storageRef);
-      }
-
-      if (targetField === 'avatarUrl') {
-        updateProfile('avatarUrl', url);
-      } else if (targetField === 'linkThumb' && linkId) {
-        updateLink(linkId, 'thumbnailUrl', url);
-      } else {
+        const url = `firestore_chunked|${fileId}|${totalChunks}`;
         updateTheme(targetField as keyof Theme, url);
       }
     } catch (err) {
       console.error("Erro no upload", err);
-      alert("Ocorreu um erro ao fazer o upload.");
+      alert("Ocorreu um erro ao processar a imagem do dispositivo.");
     } finally {
+      if (e.target) {
+        e.target.value = '';
+      }
       setUploadingState(prev => ({ ...prev, [uploadKey]: false }));
       setUploadProgress(prev => ({ ...prev, [uploadKey]: 0 }));
     }
@@ -355,37 +409,79 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
         {activeTab === 'profile' && (
           <div className="space-y-6 pb-8">
             <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-6">
-              <div className="space-y-3">
-                <label className="text-sm font-bold text-gray-900 block">Foto de Perfil (URL ou Arquivo)</label>
-                <div className="flex gap-4 items-center">
-                  <label className={`relative w-20 h-20 bg-gray-100 border border-gray-200 overflow-hidden flex-shrink-0 flex items-center justify-center cursor-pointer group ${
-                    data.theme.avatarShape === 'round' ? 'rounded-full' : 
-                    data.theme.avatarShape === 'rounded' ? 'rounded-2xl' : 'rounded-none'
-                  }`}>
+              <div className="space-y-4">
+                <label className="text-sm font-bold text-gray-900 block">Foto de Perfil</label>
+                <div className="flex flex-col sm:flex-row gap-4 items-center">
+                  <div 
+                    onClick={() => avatarFileInputRef.current?.click()}
+                    role="button"
+                    tabIndex={0}
+                    title="Clique ou toque para escolher uma foto"
+                    className={`relative w-24 h-24 bg-gray-100 border-2 border-dashed border-gray-300 hover:border-blue-500 overflow-hidden flex-shrink-0 flex items-center justify-center cursor-pointer transition-all shadow-sm group ${
+                      data.theme.avatarShape === 'round' ? 'rounded-full' : 
+                      data.theme.avatarShape === 'rounded' ? 'rounded-2xl' : 'rounded-none'
+                    }`}
+                  >
                     {data.profile.avatarUrl ? (
                       <img src={data.profile.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                     ) : (
-                      <User className="w-8 h-8 text-gray-400" />
+                      <User className="w-10 h-10 text-gray-400" />
                     )}
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Camera className="w-6 h-6 text-white" />
+                    
+                    {/* Badge de câmera ou spinner de carregamento */}
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity opacity-70 group-hover:opacity-100">
+                      {uploadingState['avatarUrl'] ? (
+                        <Loader2 className="w-6 h-6 text-white animate-spin" />
+                      ) : (
+                        <Camera className="w-6 h-6 text-white drop-shadow-md" />
+                      )}
                     </div>
+
                     <input 
+                      ref={avatarFileInputRef}
                       type="file" 
                       accept="image/*" 
                       onChange={(e) => handleFileUpload(e, 'image', 'avatarUrl')}
                       className="hidden" 
                     />
-                  </label>
-                  <div className="flex-1 space-y-2">
+                  </div>
+
+                  <div className="flex-1 w-full space-y-2.5 text-center sm:text-left">
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                      <button
+                        type="button"
+                        onClick={() => avatarFileInputRef.current?.click()}
+                        disabled={uploadingState['avatarUrl']}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition-colors active:scale-95 disabled:opacity-50"
+                      >
+                        {uploadingState['avatarUrl'] ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Upload className="w-4 h-4" />
+                        )}
+                        {uploadingState['avatarUrl'] ? 'Processando foto...' : 'Carregar do Aparelho'}
+                      </button>
+
+                      {data.profile.avatarUrl && (
+                        <button
+                          type="button"
+                          onClick={() => updateProfile('avatarUrl', '')}
+                          className="inline-flex items-center gap-1.5 px-3 py-2.5 bg-gray-100 hover:bg-red-50 hover:text-red-600 text-gray-600 rounded-xl text-xs sm:text-sm font-medium transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Remover
+                        </button>
+                      )}
+                    </div>
+
                     <input 
                       type="url" 
                       value={data.profile.avatarUrl}
                       onChange={(e) => updateProfile('avatarUrl', e.target.value)}
                       placeholder="Ou cole a URL da imagem (https://...)"
-                      className="w-full bg-gray-100 border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-gray-200/70 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                      className="w-full bg-gray-100 border-transparent rounded-xl px-4 py-2.5 text-xs sm:text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-gray-200/70 focus:ring-2 focus:ring-blue-500/20 transition-all"
                     />
-                    <p className="text-xs text-gray-500 font-medium px-1">Clique na foto para enviar um arquivo.</p>
+                    <p className="text-[11px] text-gray-500 font-medium">Toque na foto ou no botão acima para escolher da sua galeria.</p>
                   </div>
                 </div>
               </div>
@@ -507,15 +603,26 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                 {data.theme.backgroundType === 'image' && (
                   <div className="pt-2">
                     <div className="flex items-center justify-center gap-3">
-                       <label className="w-12 h-12 bg-gray-100 hover:bg-gray-200 cursor-pointer rounded-full flex items-center justify-center text-gray-500 transition-colors">
+                       <button 
+                         type="button"
+                         onClick={() => bgImageInputRef.current?.click()}
+                         className="w-12 h-12 bg-gray-100 hover:bg-gray-200 cursor-pointer rounded-full flex items-center justify-center text-gray-600 transition-colors shadow-sm"
+                         title="Carregar imagem do dispositivo"
+                       >
                          {uploadingState['backgroundImageUrl'] ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
-                         <input type="file" accept="image/*" onChange={(e) => handleFileUpload(e, 'image', 'backgroundImageUrl')} className="hidden" />
-                       </label>
+                       </button>
+                       <input 
+                         ref={bgImageInputRef}
+                         type="file" 
+                         accept="image/*" 
+                         onChange={(e) => handleFileUpload(e, 'image', 'backgroundImageUrl')} 
+                         className="hidden" 
+                       />
                        <input 
                           type="url" 
                           value={data.theme.backgroundImageUrl}
                           onChange={(e) => updateTheme('backgroundImageUrl', e.target.value)}
-                          placeholder="Cole a URL ou anexe uma imagem..."
+                          placeholder="Cole a URL ou carregue uma imagem..."
                           className="flex-1 text-center bg-gray-100 border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                        />
                     </div>
@@ -525,15 +632,26 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                 {data.theme.backgroundType === 'video' && (
                   <div className="pt-2">
                     <div className="flex items-center gap-3">
-                       <label className="w-12 h-12 bg-gray-100 hover:bg-gray-200 cursor-pointer rounded-full flex items-center justify-center text-gray-500 transition-colors" title="Upload Vídeo/GIF (Max 5MB)">
+                       <button 
+                         type="button"
+                         onClick={() => bgVideoInputRef.current?.click()}
+                         className="w-12 h-12 bg-gray-100 hover:bg-gray-200 cursor-pointer rounded-full flex items-center justify-center text-gray-600 transition-colors shadow-sm" 
+                         title="Upload Vídeo/GIF (Max 5MB)"
+                       >
                          {uploadingState['backgroundVideoUrl'] ? (
                            <div className="flex flex-col items-center">
                              <Loader2 className="w-4 h-4 animate-spin" />
                              {uploadProgress['backgroundVideoUrl'] > 0 && <span className="text-[10px] leading-tight font-medium mt-0.5">{uploadProgress['backgroundVideoUrl']}%</span>}
                            </div>
                          ) : <Upload className="w-5 h-5" />}
-                         <input type="file" accept="video/*,image/gif" onChange={(e) => handleFileUpload(e, 'video', 'backgroundVideoUrl')} className="hidden" />
-                       </label>
+                       </button>
+                       <input 
+                         ref={bgVideoInputRef}
+                         type="file" 
+                         accept="video/*,image/gif" 
+                         onChange={(e) => handleFileUpload(e, 'video', 'backgroundVideoUrl')} 
+                         className="hidden" 
+                       />
                        <input 
                           type="url" 
                           value={data.theme.backgroundVideoUrl}
