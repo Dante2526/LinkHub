@@ -41,11 +41,41 @@ export interface Profile {
   avatarUrl: string;
 }
 
+export interface Advertisement {
+  enabled: boolean;
+  title: string;
+  description: string;
+  imageUrl?: string;
+  badgeText?: string;
+  buttonText: string;
+  buttonUrl: string;
+  price?: string;
+  originalPrice?: string;
+  timerSeconds: number; // default 5 seconds
+  frequencyHours: number; // default 3 hours
+  updatedAt?: number;
+}
+
 export interface AppData {
   profile: Profile;
   theme: Theme;
   links: LinkItem[];
+  ad?: Advertisement;
 }
+
+export const defaultAd: Advertisement = {
+  enabled: false,
+  title: 'Achadinho Exclusivo na Shopee!',
+  description: 'Aproveite esta oferta especial com super desconto e frete grátis por tempo limitado.',
+  imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80',
+  badgeText: 'Achadinho Shopee 🔥',
+  buttonText: 'Aproveitar na Shopee',
+  buttonUrl: 'https://shopee.com.br',
+  price: 'R$ 39,90',
+  originalPrice: 'R$ 89,90',
+  timerSeconds: 5,
+  frequencyHours: 3,
+};
 
 export const defaultTheme: Theme = {
   backgroundType: 'color',

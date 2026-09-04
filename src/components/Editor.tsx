@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AppData, LinkItem, Theme } from '../types';
-import { GripVertical, Plus, Trash2, Image as ImageIcon, Video, Palette, Link as LinkIcon, User, Camera, BarChart3, MousePointerClick, Clock, Calendar, Eye, Loader2, Upload } from 'lucide-react';
+import { AppData, LinkItem, Theme, Advertisement, defaultAd } from '../types';
+import { GripVertical, Plus, Trash2, Image as ImageIcon, Video, Palette, Link as LinkIcon, User, Camera, BarChart3, MousePointerClick, Clock, Calendar, Eye, Loader2, Upload, ShoppingBag, Megaphone, Sparkles, ExternalLink, Play, Tag, Timer, CheckCircle2 } from 'lucide-react';
 import { ColorPicker } from './ColorPicker';
 import { CustomSelect, SelectOption } from './CustomSelect';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -94,7 +94,7 @@ interface EditorProps {
 }
 
 export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'links' | 'theme' | 'stats'>('links');
+  const [activeTab, setActiveTab] = useState<'profile' | 'links' | 'theme' | 'ad' | 'stats'>('links');
   const [uploadingState, setUploadingState] = useState<Record<string, boolean>>({});
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [metrics, setMetrics] = useState({ views: 0, clicks: 0, clicksByLink: {} as Record<string, number>, bestDay: '--', bestHour: '--' });
@@ -103,6 +103,38 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const bgImageInputRef = useRef<HTMLInputElement>(null);
   const bgVideoInputRef = useRef<HTMLInputElement>(null);
+  const adImageInputRef = useRef<HTMLInputElement>(null);
+
+  const updateAd = (field: keyof Advertisement, value: any) => {
+    const currentAd = data.ad || defaultAd;
+    const updated: Advertisement = {
+      ...currentAd,
+      [field]: value,
+      updatedAt: Date.now()
+    };
+    onChange({ ...data, ad: updated });
+  };
+
+  const handleAdImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingState(prev => ({ ...prev, adImage: true }));
+    try {
+      const compressedDataUrl = await compressImageToDataUrl(file, 800, 0.8);
+      const resolvedUrl = compressedDataUrl || URL.createObjectURL(file);
+      updateAd('imageUrl', resolvedUrl);
+    } catch (err) {
+      console.error("Erro ao subir foto do produto para o anúncio", err);
+    } finally {
+      if (e.target) e.target.value = '';
+      setUploadingState(prev => ({ ...prev, adImage: false }));
+    }
+  };
+
+  const triggerAdPreview = () => {
+    window.dispatchEvent(new CustomEvent('linkhub_trigger_ad_preview'));
+  };
 
   // Helper nativo e ultrarrápido para comprimir imagem no dispositivo sem depender de web workers
   const compressImageToDataUrl = (file: File, maxDimension = 320, quality = 0.75): Promise<string> => {
@@ -340,28 +372,36 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
     <div className="w-full h-full flex flex-col">
       {/* Tabs */}
       <div className="px-6 pb-2">
-        <div className="flex bg-gray-200/60 p-1 rounded-full gap-1">
+        <div className="flex bg-gray-200/60 p-1 rounded-full gap-1 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setActiveTab('links')}
-            className={`flex-1 py-2 px-1 rounded-full flex items-center justify-center gap-1 font-semibold text-xs transition-all ${activeTab === 'links' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+            className={`flex-1 py-2 px-1.5 rounded-full flex items-center justify-center gap-1 font-semibold text-xs whitespace-nowrap transition-all ${activeTab === 'links' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
           >
             Links
           </button>
           <button
             onClick={() => setActiveTab('profile')}
-            className={`flex-1 py-2 px-1 rounded-full flex items-center justify-center gap-1 font-semibold text-xs transition-all ${activeTab === 'profile' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+            className={`flex-1 py-2 px-1.5 rounded-full flex items-center justify-center gap-1 font-semibold text-xs whitespace-nowrap transition-all ${activeTab === 'profile' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
           >
             Perfil
           </button>
           <button
             onClick={() => setActiveTab('theme')}
-            className={`flex-1 py-2 px-1 rounded-full flex items-center justify-center gap-1 font-semibold text-xs transition-all ${activeTab === 'theme' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+            className={`flex-1 py-2 px-1.5 rounded-full flex items-center justify-center gap-1 font-semibold text-xs whitespace-nowrap transition-all ${activeTab === 'theme' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
           >
             Tema
           </button>
           <button
+            onClick={() => setActiveTab('ad')}
+            className={`flex-1 py-2 px-1.5 rounded-full flex items-center justify-center gap-1 font-semibold text-xs whitespace-nowrap transition-all ${activeTab === 'ad' ? 'bg-white text-[#ee4d2d] shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+            title="Cartão de Anúncio / Shopee"
+          >
+            <ShoppingBag className="w-3.5 h-3.5 flex-shrink-0" />
+            Anúncio
+          </button>
+          <button
             onClick={() => setActiveTab('stats')}
-            className={`flex-1 py-2 px-1 rounded-full flex items-center justify-center gap-1 font-semibold text-xs transition-all ${activeTab === 'stats' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
+            className={`flex-1 py-2 px-1.5 rounded-full flex items-center justify-center gap-1 font-semibold text-xs whitespace-nowrap transition-all ${activeTab === 'stats' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-900'}`}
           >
             Métricas
           </button>
@@ -1119,6 +1159,342 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                     options={FONT_FAMILY_OPTIONS}
                  />
                </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'ad' && (
+          <div className="space-y-6 pb-8">
+            {/* Input oculto para upload de imagem do anúncio */}
+            <input 
+              type="file" 
+              ref={adImageInputRef} 
+              onChange={handleAdImageUpload} 
+              accept="image/*" 
+              className="hidden" 
+            />
+
+            {/* Cabeçalho do Anúncio */}
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 text-center space-y-3">
+              <div className="w-12 h-12 bg-gradient-to-tr from-[#ee4d2d] to-[#ff7a45] text-white rounded-full flex items-center justify-center mx-auto shadow-md shadow-orange-500/20">
+                <ShoppingBag className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900">Propaganda & Indicação Shopee</h3>
+              <p className="text-sm text-gray-500 max-w-md mx-auto leading-relaxed">
+                Cartão centralizado de anúncio com cronômetro de 5 segundos. Ideal para links de afiliados da Shopee. Atualiza em tempo real para todos os usuários!
+              </p>
+
+              <div className="pt-2 flex justify-center">
+                <button
+                  type="button"
+                  onClick={triggerAdPreview}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-orange-50 hover:bg-orange-100 text-[#ee4d2d] font-bold text-xs rounded-full border border-orange-200 transition-all shadow-xs active:scale-95 cursor-pointer"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  <span>Testar Exibição no Preview (Abrir Pop-up)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Status de Ativação */}
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-gray-900">Status do Anúncio</h4>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {(data.ad?.enabled ?? defaultAd.enabled)
+                      ? 'O anúncio está ativado e sendo exibido aos visitantes.'
+                      : 'O anúncio está pausado e não será exibido.'}
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={data.ad?.enabled ?? defaultAd.enabled} 
+                    onChange={(e) => updateAd('enabled', e.target.checked)} 
+                    className="sr-only peer"
+                  />
+                  <div className="w-12 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#ee4d2d]"></div>
+                </label>
+              </div>
+
+              <div className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-xs font-medium ${(data.ad?.enabled ?? defaultAd.enabled) ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-gray-50 text-gray-600 border border-gray-100'}`}>
+                <div className={`w-2 h-2 rounded-full ${(data.ad?.enabled ?? defaultAd.enabled) ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}`} />
+                <span>{(data.ad?.enabled ?? defaultAd.enabled) ? 'Ativo • Salvo no Firestore e sincronizado para todos os visitantes' : 'Pausado • Não aparecerá no perfil'}</span>
+              </div>
+            </div>
+
+            {/* Link de Indicação / Afiliado Shopee */}
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-gray-900 flex items-center gap-2">
+                  <ShoppingBag className="w-4 h-4 text-[#ee4d2d]" />
+                  Link de Indicação (Afiliado Shopee)
+                </h4>
+                {data.ad?.buttonUrl && (
+                  <button
+                    type="button"
+                    onClick={() => window.open(data.ad?.buttonUrl, '_blank', 'noopener,noreferrer')}
+                    className="text-xs font-semibold text-[#ee4d2d] hover:underline flex items-center gap-1"
+                  >
+                    <span>Testar Link</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <input
+                  type="url"
+                  value={data.ad?.buttonUrl ?? defaultAd.buttonUrl}
+                  onChange={(e) => updateAd('buttonUrl', e.target.value)}
+                  placeholder="https://s.shopee.com.br/... ou https://shopee.com.br/..."
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#ee4d2d] focus:bg-white transition-all font-mono text-xs"
+                />
+                <p className="text-[11px] text-gray-500">
+                  Cole seu link de afiliado gerado na Shopee. Quando o visitante clicar no botão do anúncio, você ganhará a comissão de indicação.
+                </p>
+              </div>
+            </div>
+
+            {/* Imagem do Produto / Banner */}
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-4">
+              <h4 className="font-bold text-gray-900 flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-blue-600" />
+                Foto do Produto / Banner
+              </h4>
+
+              {data.ad?.imageUrl ? (
+                <div className="space-y-3">
+                  <div className="relative w-full aspect-[16/9] rounded-2xl overflow-hidden border border-gray-200 bg-gray-50 group">
+                    <img
+                      src={data.ad.imageUrl}
+                      alt="Banner do Anúncio"
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => updateAd('imageUrl', '')}
+                      className="absolute top-2 right-2 p-1.5 bg-black/70 hover:bg-black text-white rounded-full transition-colors cursor-pointer"
+                      title="Remover Imagem"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => adImageInputRef.current?.click()}
+                      disabled={uploadingState['adImage']}
+                      className="flex-1 py-2.5 px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      {uploadingState['adImage'] ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin text-orange-600" />
+                          <span>Processando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4" />
+                          <span>Trocar Foto</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateAd('imageUrl', '')}
+                      className="py-2.5 px-3 text-red-600 hover:bg-red-50 rounded-2xl text-xs font-semibold transition-colors cursor-pointer"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div 
+                    onClick={() => adImageInputRef.current?.click()}
+                    className="border-2 border-dashed border-gray-200 hover:border-orange-400 bg-gray-50 hover:bg-orange-50/40 rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2"
+                  >
+                    <div className="w-10 h-10 bg-orange-100 text-[#ee4d2d] rounded-full flex items-center justify-center">
+                      <Camera className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-gray-800">Clique para enviar foto do produto</p>
+                      <p className="text-[11px] text-gray-400 mt-0.5">JPG, PNG ou WebP direto do seu aparelho</p>
+                    </div>
+                  </div>
+
+                  <div className="relative flex items-center">
+                    <div className="flex-grow border-t border-gray-200"></div>
+                    <span className="flex-shrink mx-3 text-gray-400 text-[11px]">ou cole uma URL de imagem</span>
+                    <div className="flex-grow border-t border-gray-200"></div>
+                  </div>
+
+                  <input
+                    type="url"
+                    value={data.ad?.imageUrl ?? ''}
+                    onChange={(e) => updateAd('imageUrl', e.target.value)}
+                    placeholder="https://exemplo.com/foto-do-produto.jpg"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#ee4d2d] focus:bg-white transition-all font-mono"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Conteúdo & Textos */}
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-4">
+              <h4 className="font-bold text-gray-900 flex items-center gap-2">
+                <Tag className="w-4 h-4 text-purple-600" />
+                Textos & Detalhes da Oferta
+              </h4>
+
+              <div className="space-y-3">
+                {/* Título */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-gray-700 block">Título do Anúncio</label>
+                  <input
+                    type="text"
+                    value={data.ad?.title ?? defaultAd.title}
+                    onChange={(e) => updateAd('title', e.target.value)}
+                    placeholder="ex: Achadinho Imperdível na Shopee!"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-[#ee4d2d] focus:bg-white transition-all font-semibold"
+                  />
+                </div>
+
+                {/* Descrição */}
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-gray-700 block">Descrição Promocional</label>
+                  <textarea
+                    rows={2}
+                    value={data.ad?.description ?? defaultAd.description}
+                    onChange={(e) => updateAd('description', e.target.value)}
+                    placeholder="ex: Aproveite frete grátis e cupom de desconto exclusivo por tempo limitado!"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#ee4d2d] focus:bg-white transition-all resize-none"
+                  />
+                </div>
+
+                {/* Preços */}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-gray-700 block">Preço com Desconto</label>
+                    <input
+                      type="text"
+                      value={data.ad?.price ?? defaultAd.price ?? ''}
+                      onChange={(e) => updateAd('price', e.target.value)}
+                      placeholder="ex: R$ 39,90"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#ee4d2d] focus:bg-white transition-all font-bold text-[#ee4d2d]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-gray-700 block">Preço Original (Riscado)</label>
+                    <input
+                      type="text"
+                      value={data.ad?.originalPrice ?? defaultAd.originalPrice ?? ''}
+                      onChange={(e) => updateAd('originalPrice', e.target.value)}
+                      placeholder="ex: R$ 89,90"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#ee4d2d] focus:bg-white transition-all text-gray-400 line-through"
+                    />
+                  </div>
+                </div>
+
+                {/* Texto do Botão */}
+                <div className="space-y-1 pt-1">
+                  <label className="text-xs font-semibold text-gray-700 block">Texto do Botão de Ação</label>
+                  <input
+                    type="text"
+                    value={data.ad?.buttonText ?? defaultAd.buttonText}
+                    onChange={(e) => updateAd('buttonText', e.target.value)}
+                    placeholder="ex: Aproveitar Oferta na Shopee"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#ee4d2d] focus:bg-white transition-all font-semibold"
+                  />
+                </div>
+
+                {/* Selo / Badge */}
+                <div className="space-y-1.5 pt-1">
+                  <label className="text-xs font-semibold text-gray-700 block">Selo / Tag em Destaque</label>
+                  <input
+                    type="text"
+                    value={data.ad?.badgeText ?? defaultAd.badgeText ?? ''}
+                    onChange={(e) => updateAd('badgeText', e.target.value)}
+                    placeholder="ex: Achadinho Shopee 🔥"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-2xl text-xs focus:outline-none focus:ring-2 focus:ring-[#ee4d2d] focus:bg-white transition-all font-medium"
+                  />
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {['Achadinho Shopee 🔥', 'Oferta Relâmpago ⚡', 'Recomendado ⭐', 'Super Cupom 🎟️'].map((badge) => (
+                      <button
+                        key={badge}
+                        type="button"
+                        onClick={() => updateAd('badgeText', badge)}
+                        className={`text-[11px] px-2.5 py-1 rounded-full border transition-all cursor-pointer ${data.ad?.badgeText === badge ? 'bg-orange-600 text-white border-orange-600 font-bold' : 'bg-gray-50 hover:bg-gray-100 text-gray-600 border-gray-200'}`}
+                      >
+                        {badge}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Regras de Exibição & Tempo */}
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-5">
+              <h4 className="font-bold text-gray-900 flex items-center gap-2">
+                <Timer className="w-4 h-4 text-emerald-600" />
+                Tempo & Frequência de Exibição
+              </h4>
+
+              {/* Tempo do Cronômetro */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-gray-700 block">
+                  Tempo antes de liberar o botão fechar
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[3, 5, 8, 10].map((sec) => (
+                    <button
+                      key={sec}
+                      type="button"
+                      onClick={() => updateAd('timerSeconds', sec)}
+                      className={`py-2 px-1 rounded-2xl text-xs font-bold border transition-all text-center cursor-pointer ${
+                        (data.ad?.timerSeconds ?? defaultAd.timerSeconds) === sec
+                          ? 'bg-[#ee4d2d] text-white border-[#ee4d2d] shadow-sm'
+                          : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
+                      }`}
+                    >
+                      {sec} segundos
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  O usuário é obrigado a visualizar o anúncio por {(data.ad?.timerSeconds ?? defaultAd.timerSeconds)} segundos antes de poder fechar.
+                </p>
+              </div>
+
+              {/* Frequência */}
+              <div className="space-y-2 pt-2 border-t border-gray-100">
+                <label className="text-xs font-semibold text-gray-700 block">
+                  Frequência de reexibição para o mesmo visitante
+                </label>
+                <div className="grid grid-cols-4 gap-2">
+                  {[1, 3, 6, 24].map((hrs) => (
+                    <button
+                      key={hrs}
+                      type="button"
+                      onClick={() => updateAd('frequencyHours', hrs)}
+                      className={`py-2 px-1 rounded-2xl text-xs font-bold border transition-all text-center cursor-pointer ${
+                        (data.ad?.frequencyHours ?? defaultAd.frequencyHours) === hrs
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
+                      }`}
+                    >
+                      {hrs === 1 ? '1 hora' : hrs === 24 ? '1 dia' : `${hrs} horas`}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  Após fechar ou clicar no anúncio, o pop-up só aparecerá novamente para essa mesma pessoa após {(data.ad?.frequencyHours ?? defaultAd.frequencyHours)} horas.
+                </p>
+              </div>
             </div>
           </div>
         )}

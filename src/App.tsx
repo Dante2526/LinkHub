@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { doc, onSnapshot, setDoc, collection, addDoc } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './lib/firebase';
-import { AppData, defaultTheme, defaultProfile, defaultLinks } from './types';
+import { AppData, defaultTheme, defaultProfile, defaultLinks, defaultAd } from './types';
 import { Editor } from './components/Editor';
 import { Preview } from './components/Preview';
 import { Login } from './components/Login';
@@ -19,6 +19,11 @@ const getInitialData = (): AppData | null => {
       if (parsed?.theme) {
         if (!parsed.theme.profileTextColor) parsed.theme.profileTextColor = '#ffffff';
         if (!parsed.theme.linkTextAlign) parsed.theme.linkTextAlign = 'center';
+      }
+      if (!parsed.ad) {
+        parsed.ad = { ...defaultAd };
+      } else {
+        parsed.ad = { ...defaultAd, ...parsed.ad };
       }
       return parsed;
     }
@@ -164,6 +169,11 @@ export default function App() {
           if (!fetchedData.theme.linkTextAlign) {
             fetchedData.theme.linkTextAlign = 'center';
           }
+          if (!fetchedData.ad) {
+            fetchedData.ad = { ...defaultAd };
+          } else {
+            fetchedData.ad = { ...defaultAd, ...fetchedData.ad };
+          }
           setData(fetchedData);
           try {
             localStorage.setItem(CACHE_KEY, JSON.stringify(fetchedData));
@@ -171,7 +181,7 @@ export default function App() {
             console.error("Erro ao salvar cache", e);
           }
         } else {
-          const defaultData = { profile: defaultProfile, theme: defaultTheme, links: defaultLinks };
+          const defaultData: AppData = { profile: defaultProfile, theme: defaultTheme, links: defaultLinks, ad: defaultAd };
           setDoc(docRef, defaultData).catch(console.error);
           setData(defaultData);
           try {

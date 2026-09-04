@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AppData, Theme } from '../types';
-import { Share2, X } from 'lucide-react';
+import { Share2, X, ShoppingBag, ExternalLink, Clock, ShieldCheck, Sparkles } from 'lucide-react';
 import { db, isFirebaseConfigured } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -148,10 +148,76 @@ const getButtonStyle = (theme: Theme): string => {
 };
 
 export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
-  const { profile, theme, links } = data;
+  const { profile, theme, links, ad } = data;
   const isAnimated = theme.backgroundType === 'animated-gradient';
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string | null>(null);
+
+  // Advertisement / Shopee Promo Modal State
+  const [isAdOpen, setIsAdOpen] = useState(false);
+  const [adCountdown, setAdCountdown] = useState<number>(ad?.timerSeconds || 5);
+
+  // Check frequency (3 hours by default) and display ad if appropriate
+  useEffect(() => {
+    const checkAndShowAd = () => {
+      if (!ad || !ad.enabled || !ad.buttonUrl) {
+        setIsAdOpen(false);
+        return;
+      }
+
+      const freqHours = ad.frequencyHours ?? 3;
+      const freqMs = freqHours * 60 * 60 * 1000;
+      const lastSeenStr = localStorage.getItem('linkhub_last_ad_seen');
+      const lastUpdatedStr = localStorage.getItem('linkhub_last_ad_updated_at');
+
+      const now = Date.now();
+      const hasExpired = !lastSeenStr || (now - Number(lastSeenStr) >= freqMs);
+      const isNewAdVersion = Boolean(ad.updatedAt && (!lastUpdatedStr || Number(lastUpdatedStr) < ad.updatedAt));
+
+      if (hasExpired || isNewAdVersion) {
+        setIsAdOpen(true);
+        setAdCountdown(ad.timerSeconds || 5);
+        if (ad.updatedAt) {
+          localStorage.setItem('linkhub_last_ad_updated_at', ad.updatedAt.toString());
+        }
+      }
+    };
+
+    checkAndShowAd();
+
+    // Listen for manual preview test triggers from Admin Editor
+    const handleTriggerPreview = () => {
+      if (ad) {
+        setIsAdOpen(true);
+        setAdCountdown(ad.timerSeconds || 5);
+      }
+    };
+
+    window.addEventListener('linkhub_trigger_ad_preview', handleTriggerPreview);
+    return () => {
+      window.removeEventListener('linkhub_trigger_ad_preview', handleTriggerPreview);
+    };
+  }, [ad]);
+
+  // 5-second countdown timer
+  useEffect(() => {
+    if (!isAdOpen || adCountdown <= 0) return;
+    const timer = setTimeout(() => {
+      setAdCountdown(prev => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [isAdOpen, adCountdown]);
+
+  const handleCloseAd = () => {
+    if (adCountdown > 0) return;
+    localStorage.setItem('linkhub_last_ad_seen', Date.now().toString());
+    setIsAdOpen(false);
+  };
+
+  const handleAdCtaClick = () => {
+    localStorage.setItem('linkhub_last_ad_seen', Date.now().toString());
+    setIsAdOpen(false);
+  };
 
   useEffect(() => {
     const url = theme.backgroundVideoUrl;
@@ -421,6 +487,116 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
                     level="Q"
                     includeMargin={false}
                   />
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Centralized Advertisement / Shopee Promo Modal */}
+      <AnimatePresence>
+        {isAdOpen && ad && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md overflow-y-auto"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: "spring", stiffness: 350, damping: 25 }}
+              className="bg-white rounded-[28px] overflow-hidden w-full max-w-sm shadow-2xl relative border border-gray-100 flex flex-col my-auto"
+              style={{ color: '#000', fontFamily: 'system-ui, -apple-system, sans-serif' }}
+            >
+              {/* Top Bar with Badge and Countdown / Close Button */}
+              <div className="flex items-center justify-between px-4 pt-3.5 pb-2.5 bg-gradient-to-r from-orange-50 via-amber-50 to-orange-50 border-b border-orange-100/70">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[#ee4d2d] text-white text-[11px] font-bold rounded-full shadow-xs uppercase tracking-wide">
+                  <Sparkles className="w-3 h-3 animate-pulse" />
+                  <span>{ad.badgeText || 'Indicação Shopee'}</span>
+                </div>
+
+                {adCountdown > 0 ? (
+                  <div 
+                    className="flex items-center gap-1.5 px-3 py-1 bg-gray-900/80 text-white rounded-full text-xs font-semibold select-none cursor-not-allowed border border-gray-700"
+                    title={`Aguarde ${adCountdown} segundos para poder fechar`}
+                  >
+                    <Clock className="w-3.5 h-3.5 text-orange-400 animate-spin" />
+                    <span>Fechar em {adCountdown}s</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleCloseAd}
+                    className="flex items-center gap-1 px-3 py-1 bg-gray-900 hover:bg-black text-white rounded-full text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Fechar</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Product Image / Banner */}
+              {ad.imageUrl && (
+                <div className="relative w-full aspect-[16/10] bg-gray-100 overflow-hidden">
+                  <img 
+                    src={ad.imageUrl} 
+                    alt={ad.title} 
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                  {ad.price && (
+                    <div className="absolute bottom-2.5 left-2.5 bg-black/85 backdrop-blur-sm text-white px-3 py-1 rounded-xl shadow-lg flex items-baseline gap-1.5">
+                      <span className="text-[11px] text-orange-400 font-semibold uppercase tracking-wide">Oferta</span>
+                      <span className="text-base font-extrabold text-white">{ad.price}</span>
+                      {ad.originalPrice && (
+                        <span className="text-[11px] text-gray-400 line-through">{ad.originalPrice}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Body Content */}
+              <div className="p-5 flex flex-col gap-3">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 leading-snug">
+                    {ad.title}
+                  </h3>
+                  {ad.description && (
+                    <p className="text-xs sm:text-sm text-gray-600 mt-1 leading-relaxed">
+                      {ad.description}
+                    </p>
+                  )}
+                </div>
+
+                {!ad.imageUrl && ad.price && (
+                  <div className="flex items-baseline gap-2 bg-orange-50 p-2.5 rounded-xl border border-orange-100">
+                    <span className="text-xl font-extrabold text-[#ee4d2d]">{ad.price}</span>
+                    {ad.originalPrice && (
+                      <span className="text-xs text-gray-400 line-through">{ad.originalPrice}</span>
+                    )}
+                  </div>
+                )}
+
+                {/* CTA Affiliate Link Button */}
+                <a
+                  href={ad.buttonUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={handleAdCtaClick}
+                  className="w-full mt-1 py-3.5 px-4 bg-gradient-to-r from-[#ee4d2d] to-[#ff5722] hover:from-[#e03d1e] hover:to-[#ee4d2d] text-white font-bold text-sm sm:text-base rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 hover:shadow-orange-500/35 transition-all transform active:scale-[0.98] text-center"
+                >
+                  <ShoppingBag className="w-5 h-5 flex-shrink-0" />
+                  <span className="truncate">{ad.buttonText || 'Aproveitar Oferta na Shopee'}</span>
+                  <ExternalLink className="w-4 h-4 flex-shrink-0 opacity-80" />
+                </a>
+
+                {/* Safe Link Disclaimer */}
+                <div className="flex items-center justify-center gap-1 text-[11px] text-gray-400 pt-0.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                  <span>Link de indicação oficial • Compra 100% segura</span>
                 </div>
               </div>
             </motion.div>
