@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AppData, LinkItem, Theme, Advertisement, defaultAd } from '../types';
-import { GripVertical, Plus, Trash2, Image as ImageIcon, Video, Palette, Link as LinkIcon, User, Camera, BarChart3, MousePointerClick, Clock, Calendar, Eye, Loader2, Upload, ShoppingBag, Megaphone, Sparkles, ExternalLink, Play, Tag, Timer, CheckCircle2 } from 'lucide-react';
+import { AppData, LinkItem, Theme, Advertisement, defaultAd, BackgroundPosition } from '../types';
+import { GripVertical, Plus, Trash2, Image as ImageIcon, Video, Palette, Link as LinkIcon, User, Camera, BarChart3, MousePointerClick, Clock, Calendar, Eye, Loader2, Upload, ShoppingBag, Megaphone, Sparkles, ExternalLink, Play, Tag, Timer, CheckCircle2, Move, Smartphone, Monitor } from 'lucide-react';
 import { ColorPicker } from './ColorPicker';
 import { CustomSelect, SelectOption } from './CustomSelect';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -91,9 +91,18 @@ const FONT_FAMILY_OPTIONS: SelectOption[] = [
 interface EditorProps {
   data: AppData;
   onChange: (data: AppData) => void;
+  previewMode?: 'mobile' | 'desktop';
+  isRepositioning?: boolean;
+  setIsRepositioning?: (val: boolean) => void;
 }
 
-export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
+export const Editor: React.FC<EditorProps> = ({ 
+  data, 
+  onChange,
+  previewMode = 'mobile',
+  isRepositioning = false,
+  setIsRepositioning,
+}) => {
   const [activeTab, setActiveTab] = useState<'profile' | 'links' | 'theme' | 'ad' | 'stats'>('links');
   const [uploadingState, setUploadingState] = useState<Record<string, boolean>>({});
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
@@ -270,6 +279,22 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
 
   const updateTheme = (field: keyof Theme, value: any) => {
     onChange({ ...data, theme: { ...data.theme, [field]: value } });
+  };
+
+  const currentMode = previewMode || 'mobile';
+  const currentPos: BackgroundPosition = (currentMode === 'mobile' 
+    ? (data.theme.backgroundPositionMobile || data.theme.backgroundPositionDesktop)
+    : (data.theme.backgroundPositionDesktop || data.theme.backgroundPositionMobile)) || { x: 50, y: 50 };
+
+  const updateBackgroundPosition = (newPos: BackgroundPosition) => {
+    const field = currentMode === 'mobile' ? 'backgroundPositionMobile' : 'backgroundPositionDesktop';
+    onChange({
+      ...data,
+      theme: {
+        ...data.theme,
+        [field]: newPos
+      }
+    });
   };
 
   const addLink = () => {
@@ -966,6 +991,130 @@ export const Editor: React.FC<EditorProps> = ({ data, onChange }) => {
                           placeholder="URL do Vídeo (Max 5MB)"
                           className="flex-1 bg-gray-100 border-transparent rounded-xl px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                        />
+                    </div>
+                  </div>
+                )}
+
+                {(data.theme.backgroundType === 'image' || data.theme.backgroundType === 'video') && (
+                  <div className="pt-4 border-t border-gray-100 space-y-4 text-left">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-gray-800">
+                          Posição no {currentMode === 'mobile' ? 'Celular (Mobile)' : 'Computador (Desktop)'}
+                        </span>
+                        <span className="text-[10px] font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full font-semibold">
+                          {currentPos.x}% • {currentPos.y}%
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsRepositioning?.(!isRepositioning)}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
+                          isRepositioning 
+                            ? 'bg-amber-500 text-white shadow-amber-500/25 ring-2 ring-amber-400/40' 
+                            : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                        }`}
+                      >
+                        <Move className="w-3.5 h-3.5" />
+                        {isRepositioning ? 'Concluir Ajuste' : 'Arrastar no Preview'}
+                      </button>
+                    </div>
+
+                    {/* Presets Rápidos */}
+                    <div className="space-y-1.5">
+                      <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider block">
+                        Alinhamento Rápido
+                      </span>
+                      <div className="grid grid-cols-5 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => updateBackgroundPosition({ x: 50, y: 0 })}
+                          className={`py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
+                            currentPos.x === 50 && currentPos.y === 0 
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                              : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                          }`}
+                        >
+                          Topo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateBackgroundPosition({ x: 50, y: 50 })}
+                          className={`py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
+                            currentPos.x === 50 && currentPos.y === 50 
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                              : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                          }`}
+                        >
+                          Centro
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateBackgroundPosition({ x: 50, y: 100 })}
+                          className={`py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
+                            currentPos.x === 50 && currentPos.y === 100 
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                              : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                          }`}
+                        >
+                          Base
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateBackgroundPosition({ x: 0, y: 50 })}
+                          className={`py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
+                            currentPos.x === 0 && currentPos.y === 50 
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                              : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                          }`}
+                        >
+                          Esquerda
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateBackgroundPosition({ x: 100, y: 50 })}
+                          className={`py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
+                            currentPos.x === 100 && currentPos.y === 50 
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
+                              : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                          }`}
+                        >
+                          Direita
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Sliders X e Y */}
+                    <div className="space-y-3 bg-gray-50/80 p-3.5 rounded-2xl border border-gray-100">
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs text-gray-600 font-medium">
+                          <span>Posição Horizontal (X)</span>
+                          <span className="font-mono font-bold text-gray-900">{currentPos.x}%</span>
+                        </div>
+                        <input 
+                          type="range" 
+                          min="0" 
+                          max="100" 
+                          value={currentPos.x}
+                          onChange={(e) => updateBackgroundPosition({ ...currentPos, x: Number(e.target.value) })}
+                          className="w-full accent-blue-600 cursor-pointer h-2 bg-gray-200 rounded-lg appearance-none"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="flex justify-between text-xs text-gray-600 font-medium">
+                          <span>Posição Vertical (Y)</span>
+                          <span className="font-mono font-bold text-gray-900">{currentPos.y}%</span>
+                        </div>
+                        <input 
+                          type="range" 
+                          min="0" 
+                          max="100" 
+                          value={currentPos.y}
+                          onChange={(e) => updateBackgroundPosition({ ...currentPos, y: Number(e.target.value) })}
+                          className="w-full accent-blue-600 cursor-pointer h-2 bg-gray-200 rounded-lg appearance-none"
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
