@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { AppData, Theme } from '../types';
-import { Share2, X, ShoppingBag, ExternalLink, Clock, ShieldCheck, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { AppData, Theme, BackgroundPosition } from '../types';
+import { Share2, X, ShoppingBag, ExternalLink, Clock, ShieldCheck, Sparkles, Move, Check, RotateCcw } from 'lucide-react';
 import { db, isFirebaseConfigured } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -9,12 +9,16 @@ import { QRCodeSVG } from 'qrcode.react';
 interface PreviewProps {
   data: AppData;
   onLinkClick?: (linkId: string) => void;
+  previewMode?: 'mobile' | 'desktop';
+  isRepositioning?: boolean;
+  onRepositionEnd?: () => void;
+  onPositionChange?: (pos: BackgroundPosition) => void;
 }
 
 // Global cache for reconstructed video blob URLs across component renders
 const videoBlobCache = new Map<string, string>();
 
-const getBackgroundStyle = (theme: Theme): React.CSSProperties => {
+const getBackgroundStyle = (theme: Theme, position: BackgroundPosition = { x: 50, y: 50 }): React.CSSProperties => {
   switch (theme.backgroundType) {
     case 'color':
       return { backgroundColor: theme.backgroundColor };
@@ -29,7 +33,7 @@ const getBackgroundStyle = (theme: Theme): React.CSSProperties => {
       return { 
         backgroundImage: `url(${theme.backgroundImageUrl})`,
         backgroundSize: 'cover',
-        backgroundPosition: 'center',
+        backgroundPosition: `${position.x}% ${position.y}%`,
         backgroundColor: theme.backgroundColor || '#111827'
       };
     case 'video':
@@ -147,11 +151,72 @@ const getButtonStyle = (theme: Theme): string => {
   return `${base} ${radiusClass} ${styleClass} ${shadowClass}`;
 };
 
-export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
+export const Preview: React.FC<PreviewProps> = ({ 
+  data, 
+  onLinkClick,
+  previewMode,
+  isRepositioning = false,
+  onRepositionEnd,
+  onPositionChange,
+}) => {
   const { profile, theme, links, ad } = data;
   const isAnimated = theme.backgroundType === 'animated-gradient';
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string | null>(null);
+
+  // Responsive device mode detection for PublicView or dynamic window sizes
+  const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1024);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const effectiveMode: 'mobile' | 'desktop' = previewMode || (windowWidth < 768 ? 'mobile' : 'desktop');
+
+  const activePosition: BackgroundPosition = (effectiveMode === 'mobile'
+    ? (theme.backgroundPositionMobile || theme.backgroundPositionDesktop)
+    : (theme.backgroundPositionDesktop || theme.backgroundPositionMobile)) || { x: 50, y: 50 };
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+  const startPointerRef = useRef({ x: 0, y: 0 });
+  const startPosRef = useRef<BackgroundPosition>({ x: 50, y: 50 });
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    isDraggingRef.current = true;
+    startPointerRef.current = { x: e.clientX, y: e.clientY };
+    startPosRef.current = { ...activePosition };
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingRef.current) return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return;
+
+    const deltaX = e.clientX - startPointerRef.current.x;
+    const deltaY = e.clientY - startPointerRef.current.y;
+
+    const newX = startPosRef.current.x - (deltaX / rect.width) * 100;
+    const newY = startPosRef.current.y - (deltaY / rect.height) * 100;
+
+    const clampedX = Math.min(100, Math.max(0, Math.round(newX)));
+    const clampedY = Math.min(100, Math.max(0, Math.round(newY)));
+
+    onPositionChange?.({ x: clampedX, y: clampedY });
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isDraggingRef.current) {
+      isDraggingRef.current = false;
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {}
+    }
+  };
 
   // Advertisement / Shopee Promo Modal State
   const [isAdOpen, setIsAdOpen] = useState(false);
@@ -279,8 +344,9 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
 
   return (
     <div 
+      ref={containerRef}
       className={`relative w-full h-full overflow-hidden ${isAnimated ? 'animated-gradient-bg' : ''}`} 
-      style={{ ...getBackgroundStyle(theme), fontFamily: theme.fontFamily }}
+      style={{ ...getBackgroundStyle(theme, activePosition), fontFamily: theme.fontFamily }}
     >
       {/* Video Background Layer (strictly contained within the preview frame) */}
       {theme.backgroundType === 'video' && resolvedVideoUrl && (
@@ -291,22 +357,87 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
           muted 
           playsInline
           className="absolute inset-0 w-full h-full object-cover pointer-events-none z-0"
+          style={{ objectPosition: `${activePosition.x}% ${activePosition.y}%` }}
         >
           <source src={resolvedVideoUrl} />
         </video>
       )}
 
+      {/* Repositioning Overlay and Control Bar */}
+      {isRepositioning && (
+        <>
+          {/* Top floating control bar */}
+          <div className="absolute top-4 inset-x-3 sm:inset-x-4 z-50 flex items-center justify-between gap-2 p-2 px-3 sm:px-4 rounded-2xl bg-gray-900/90 backdrop-blur-md border border-white/20 text-white shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-blue-600/30 text-blue-400 rounded-lg">
+                <Move className="w-4 h-4 animate-pulse" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-bold leading-tight">
+                  Enquadramento {effectiveMode === 'mobile' ? 'Mobile' : 'Desktop'}
+                </span>
+                <span className="text-[10px] text-gray-300 font-mono">
+                  X: {activePosition.x}% • Y: {activePosition.y}%
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPositionChange?.({ x: 50, y: 50 });
+                }}
+                className="px-2.5 py-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 rounded-xl flex items-center gap-1 transition-colors cursor-pointer"
+                title="Restaurar ao centro (50% 50%)"
+              >
+                <RotateCcw className="w-3 h-3" />
+                Centro
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRepositionEnd?.();
+                }}
+                className="px-3 py-1.5 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center gap-1 shadow-md shadow-blue-600/30 transition-all cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5" />
+                Concluir
+              </button>
+            </div>
+          </div>
+
+          {/* Interactive Drag Overlay */}
+          <div
+            className="absolute inset-0 z-40 cursor-grab active:cursor-grabbing touch-none select-none"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+          >
+            <div className="w-full h-full flex items-center justify-center pointer-events-none">
+              <div className="w-12 h-12 rounded-full border-2 border-white/70 flex items-center justify-center bg-black/35 backdrop-blur-xs shadow-xl">
+                <Move className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Top right share button */}
-      <button
-        onClick={() => setIsShareModalOpen(true)}
-        className="absolute top-6 right-6 p-3 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md shadow-sm border border-white/20 transition-all z-40 group"
-        style={{ color: theme.profileTextColor || '#ffffff' }}
-      >
-        <Share2 className="w-5 h-5 opacity-80 group-hover:opacity-100" />
-      </button>
+      {!isRepositioning && (
+        <button
+          onClick={() => setIsShareModalOpen(true)}
+          className="absolute top-6 right-6 p-3 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md shadow-sm border border-white/20 transition-all z-40 group"
+          style={{ color: theme.profileTextColor || '#ffffff' }}
+        >
+          <Share2 className="w-5 h-5 opacity-80 group-hover:opacity-100" />
+        </button>
+      )}
 
       {/* Scrollable Content (keeps wallpaper static inside device while links scroll) */}
-      <div className="w-full h-full overflow-y-auto no-scrollbar relative z-10">
+      <div className={`w-full h-full overflow-y-auto no-scrollbar relative z-10 transition-opacity duration-300 ${isRepositioning ? 'opacity-25 pointer-events-none select-none' : 'opacity-100'}`}>
         <div className="max-w-xl mx-auto px-6 py-12 flex flex-col items-center min-h-full">
           {/* Profile */}
           <motion.div 
