@@ -5,12 +5,19 @@ export type LinkFormat = 'classic' | 'featured' | 'compact' | 'minimal' | 'banne
 export type AvatarShape = 'round' | 'rounded' | 'square';
 export type LinkAnimation = 'none' | 'pulse' | 'bounce' | 'shake' | 'glow';
 
+export interface BackgroundPosition {
+  x: number; // 0 a 100 (%)
+  y: number; // 0 a 100 (%)
+}
+
 export interface Theme {
   backgroundType: BackgroundType;
   backgroundColor: string;
   backgroundGradient: string; // e.g., 'from-pink-500 to-purple-500' or custom CSS
   backgroundImageUrl: string;
   backgroundVideoUrl: string;
+  backgroundPositionMobile?: BackgroundPosition;
+  backgroundPositionDesktop?: BackgroundPosition;
   fontFamily: string;
   buttonStyle: ButtonStyle;
   buttonColor: string;
@@ -83,6 +90,8 @@ export const defaultTheme: Theme = {
   backgroundGradient: 'linear-gradient(45deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%)',
   backgroundImageUrl: '',
   backgroundVideoUrl: '',
+  backgroundPositionMobile: { x: 50, y: 50 },
+  backgroundPositionDesktop: { x: 50, y: 50 },
   fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
   buttonStyle: 'solid',
   buttonColor: '#ffffff',
