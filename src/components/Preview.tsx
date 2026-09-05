@@ -318,7 +318,9 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
           {profile.avatarUrl ? (
             <img 
               src={profile.avatarUrl} 
-              alt={profile.name} 
+              alt={profile.name}
+              decoding="async"
+              loading="eager"
               className={`w-24 h-24 object-cover shadow-lg border-2 border-white/50 mb-4 ${
                 theme.avatarShape === 'round' ? 'rounded-full' : 
                 theme.avatarShape === 'rounded' ? 'rounded-3xl' : 'rounded-none'
@@ -390,7 +392,7 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
                   <div className="flex flex-col w-full">
                     {link.thumbnailUrl && (
                       <div className="w-full h-40 bg-black/5 flex-shrink-0">
-                        <img src={link.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                        <img src={link.thumbnailUrl} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       </div>
                     )}
                     <div className="p-4 w-full text-center">
@@ -401,7 +403,7 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
                 ) : format === 'compact' ? (
                   <div className="relative w-full flex items-center justify-center min-h-[46px] py-2 px-3 text-center">
                     {link.thumbnailUrl && (
-                      <img src={link.thumbnailUrl} alt="" className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                      <img src={link.thumbnailUrl} alt="" loading="lazy" decoding="async" className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full object-cover flex-shrink-0" />
                     )}
                     <div className={`w-full ${link.thumbnailUrl ? 'px-9' : 'px-2'} flex flex-col items-center justify-center text-center`}>
                       <div className="font-medium text-sm leading-snug break-words">{link.title}</div>
@@ -418,7 +420,7 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
                     {link.thumbnailUrl ? (
                       <>
                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent z-10" />
-                         <img src={link.thumbnailUrl} alt="" className="absolute inset-0 w-full h-full object-cover z-0" />
+                         <img src={link.thumbnailUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover z-0" />
                       </>
                     ) : (
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/10 z-10" />
@@ -543,6 +545,8 @@ export const Preview: React.FC<PreviewProps> = ({ data, onLinkClick }) => {
                   <img 
                     src={ad.imageUrl} 
                     alt={ad.title} 
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover"
                     referrerPolicy="no-referrer"
                   />

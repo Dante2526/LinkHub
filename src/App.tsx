@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { doc, onSnapshot, setDoc, collection, addDoc } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './lib/firebase';
 import { AppData, defaultTheme, defaultProfile, defaultLinks, defaultAd } from './types';
-import { Editor } from './components/Editor';
 import { Preview } from './components/Preview';
-import { Login } from './components/Login';
-import { Smartphone, Monitor, ExternalLink } from 'lucide-react';
+import { Smartphone, Monitor, ExternalLink, Loader2 } from 'lucide-react';
+
+const LazyEditor = lazy(() => import('./components/Editor').then(m => ({ default: m.Editor })));
+const LazyLogin = lazy(() => import('./components/Login').then(m => ({ default: m.Login })));
 
 const STORAGE_KEY = 'link-organizer-data';
 const CACHE_KEY = 'linkhub_cached_profile';
@@ -33,7 +34,7 @@ const getInitialData = (): AppData | null => {
   return null;
 };
 
-const MemoizedEditor = React.memo(Editor);
+const MemoizedEditor = React.memo(LazyEditor);
 const MemoizedPreview = React.memo(Preview);
 
 function AdminView({ data, setData, onLinkClick }: { data: AppData, setData: (d: AppData) => void, onLinkClick: (id: string) => void }) {
@@ -59,7 +60,16 @@ function AdminView({ data, setData, onLinkClick }: { data: AppData, setData: (d:
           </div>
         </div>
         <div className="flex-1 overflow-hidden">
-          <MemoizedEditor data={data} onChange={setData} />
+          <Suspense fallback={
+            <div className="flex h-full w-full items-center justify-center bg-gray-50">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                <span className="text-xs text-gray-500 font-medium">Carregando painel do editor...</span>
+              </div>
+            </div>
+          }>
+            <MemoizedEditor data={data} onChange={setData} />
+          </Suspense>
         </div>
       </div>
 
@@ -245,7 +255,15 @@ export default function App() {
 
   const renderAdmin = () => {
     if (!adminEmail) {
-      return <Login onLogin={handleLogin} />;
+      return (
+        <Suspense fallback={
+          <div className="flex h-screen w-full items-center justify-center bg-gray-900 text-white">
+            <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+          </div>
+        }>
+          <LazyLogin onLogin={handleLogin} />
+        </Suspense>
+      );
     }
     return <AdminView data={data} setData={handleUpdateData} onLinkClick={() => {}} />;
   };
