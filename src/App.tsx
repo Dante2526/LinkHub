@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { doc, onSnapshot, setDoc, collection, addDoc } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './lib/firebase';
-import { AppData, defaultTheme, defaultProfile, defaultLinks, defaultAd } from './types';
+import { AppData, defaultTheme, defaultProfile, defaultLinks, defaultAd, BackgroundPosition } from './types';
 import { Preview } from './components/Preview';
 import { Smartphone, Monitor, ExternalLink, Loader2 } from 'lucide-react';
 
@@ -20,6 +20,8 @@ const getInitialData = (): AppData | null => {
       if (parsed?.theme) {
         if (!parsed.theme.profileTextColor) parsed.theme.profileTextColor = '#ffffff';
         if (!parsed.theme.linkTextAlign) parsed.theme.linkTextAlign = 'center';
+        if (!parsed.theme.backgroundPositionMobile) parsed.theme.backgroundPositionMobile = { x: 50, y: 50 };
+        if (!parsed.theme.backgroundPositionDesktop) parsed.theme.backgroundPositionDesktop = { x: 50, y: 50 };
       }
       if (!parsed.ad) {
         parsed.ad = { ...defaultAd };
@@ -40,6 +42,18 @@ const MemoizedPreview = React.memo(Preview);
 function AdminView({ data, setData, onLinkClick }: { data: AppData, setData: (d: AppData) => void, onLinkClick: (id: string) => void }) {
   const [previewMode, setPreviewMode] = useState<'mobile' | 'desktop'>('mobile');
   const [showMobilePreview, setShowMobilePreview] = useState(false);
+  const [isRepositioning, setIsRepositioning] = useState(false);
+
+  const handlePositionChange = (pos: BackgroundPosition) => {
+    const field = previewMode === 'mobile' ? 'backgroundPositionMobile' : 'backgroundPositionDesktop';
+    setData({
+      ...data,
+      theme: {
+        ...data.theme,
+        [field]: pos
+      }
+    });
+  };
 
   return (
     <div className="flex h-screen w-full bg-[#f2f2f2] text-gray-900 overflow-hidden font-sans relative">
@@ -68,7 +82,13 @@ function AdminView({ data, setData, onLinkClick }: { data: AppData, setData: (d:
               </div>
             </div>
           }>
-            <MemoizedEditor data={data} onChange={setData} />
+            <MemoizedEditor 
+              data={data} 
+              onChange={setData} 
+              previewMode={previewMode}
+              isRepositioning={isRepositioning}
+              setIsRepositioning={setIsRepositioning}
+            />
           </Suspense>
         </div>
       </div>
@@ -128,7 +148,14 @@ function AdminView({ data, setData, onLinkClick }: { data: AppData, setData: (d:
               </div>
             )}
             
-            <MemoizedPreview data={data} onLinkClick={onLinkClick} />
+            <MemoizedPreview 
+              data={data} 
+              onLinkClick={onLinkClick} 
+              previewMode={previewMode}
+              isRepositioning={isRepositioning}
+              onRepositionEnd={() => setIsRepositioning(false)}
+              onPositionChange={handlePositionChange}
+            />
           </div>
         </div>
       </div>
@@ -178,6 +205,12 @@ export default function App() {
           }
           if (!fetchedData.theme.linkTextAlign) {
             fetchedData.theme.linkTextAlign = 'center';
+          }
+          if (!fetchedData.theme.backgroundPositionMobile) {
+            fetchedData.theme.backgroundPositionMobile = { x: 50, y: 50 };
+          }
+          if (!fetchedData.theme.backgroundPositionDesktop) {
+            fetchedData.theme.backgroundPositionDesktop = { x: 50, y: 50 };
           }
           if (!fetchedData.ad) {
             fetchedData.ad = { ...defaultAd };
