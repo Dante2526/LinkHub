@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { doc, onSnapshot, setDoc, collection, addDoc } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './lib/firebase';
@@ -212,6 +212,15 @@ export default function App() {
   const [data, setData] = useState<AppData | null>(getInitialData);
   const [loading, setLoading] = useState<boolean>(() => !getInitialData());
   const [adminEmail, setAdminEmail] = useState<string | null>(localStorage.getItem('linkhub_admin_email'));
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!isFirebaseConfigured) {
@@ -248,7 +257,13 @@ export default function App() {
           } else {
             fetchedData.ad = { ...defaultAd, ...fetchedData.ad };
           }
-          setData(fetchedData);
+          setData(prev => {
+            // Evita re-render desnecessário se os dados locais já forem idênticos aos do Firestore
+            if (prev && JSON.stringify(prev) === JSON.stringify(fetchedData)) {
+              return prev;
+            }
+            return fetchedData;
+          });
           try {
             localStorage.setItem(CACHE_KEY, JSON.stringify(fetchedData));
           } catch (e) {
@@ -284,12 +299,22 @@ export default function App() {
     setData(prev => {
       if (!prev) return prev;
       const newData = typeof updater === 'function' ? updater(prev) : updater;
-      if (isFirebaseConfigured) {
-        setDoc(doc(db, 'perfis', 'principal'), newData).catch(console.error);
-      }
+      
+      // Atualização imediata no cache do navegador para resposta visual instantânea (60 FPS)
       try {
         localStorage.setItem(CACHE_KEY, JSON.stringify(newData));
       } catch (e) {}
+
+      // Debounce inteligente na gravação do Firestore (evita dezenas de escritas por segundo enquanto digita)
+      if (isFirebaseConfigured) {
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+        }
+        saveTimeoutRef.current = setTimeout(() => {
+          setDoc(doc(db, 'perfis', 'principal'), newData).catch(console.error);
+        }, 350);
+      }
+
       return newData;
     });
   }, []);
