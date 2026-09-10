@@ -643,81 +643,85 @@ export const Preview: React.FC<PreviewProps> = ({
               style={{ color: '#000', fontFamily: 'system-ui, -apple-system, sans-serif' }}
             >
               {/* Top Bar with Badge and Countdown / Close Button */}
-              <div className="flex items-center justify-between px-4 pt-3.5 pb-2.5 bg-gradient-to-r from-orange-50 via-amber-50 to-orange-50 border-b border-orange-100/70 flex-shrink-0">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[#ee4d2d] text-white text-[11px] font-bold rounded-full shadow-xs uppercase tracking-wide">
-                  <Sparkles className="w-3 h-3 animate-pulse" />
-                  <span>{ad.badgeText || 'Indicação Shopee'}</span>
+              <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-orange-50/80 via-white to-orange-50/80 border-b border-orange-100 flex-shrink-0">
+                {/* Badge à esquerda com whitespace-nowrap e respiro */}
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#ee4d2d] text-white text-[11px] font-black rounded-full shadow-xs uppercase tracking-wider whitespace-nowrap flex-shrink-0">
+                  <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-pulse flex-shrink-0" />
+                  <span className="whitespace-nowrap">{ad.badgeText || 'Oferta Relâmpago'}</span>
                 </div>
 
-                {adCountdown > 0 ? (
-                  <div 
-                    className="flex items-center gap-1.5 px-3 py-1 bg-gray-900/80 text-white rounded-full text-xs font-semibold select-none cursor-not-allowed border border-gray-700"
-                    title={`Aguarde ${adCountdown} segundos para poder fechar`}
-                  >
-                    <Clock className="w-3.5 h-3.5 text-orange-400 animate-spin" />
-                    <span>Fechar em {adCountdown}s</span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={handleCloseAd}
-                    className="flex items-center gap-1 px-3 py-1 bg-gray-900 hover:bg-black text-white rounded-full text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                    <span>Fechar</span>
-                  </button>
-                )}
+                {/* Botão fechar / temporizador à direita com espaçamento livre */}
+                <div className="flex items-center flex-shrink-0 pl-4">
+                  {adCountdown > 0 ? (
+                    <div 
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900/85 text-white rounded-full text-xs font-bold select-none cursor-not-allowed border border-gray-700 whitespace-nowrap"
+                      title={`Aguarde ${adCountdown} segundos para poder fechar`}
+                    >
+                      <Clock className="w-3.5 h-3.5 text-orange-400 animate-spin flex-shrink-0" />
+                      <span className="whitespace-nowrap">Aguarde {adCountdown}s</span>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleCloseAd}
+                      title="Fechar anúncio"
+                      className="flex items-center justify-center w-8 h-8 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-600 hover:text-gray-900 rounded-full transition-all cursor-pointer shadow-xs active:scale-95 flex-shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {/* Product Image / Banner - Adaptável 100% sem cortes */}
+              {/* Product Image / Banner - Adaptável 100% sem cortes e sem sobreposição */}
               {ad.imageUrl && (
-                <div className="relative w-full bg-gradient-to-b from-orange-50/30 via-white to-gray-50/40 flex items-center justify-center p-3 sm:p-4 border-b border-gray-100 overflow-hidden flex-shrink-0">
+                <div className="relative w-full bg-gradient-to-b from-orange-50/20 via-white to-gray-50/40 flex items-center justify-center p-3 sm:p-4 border-b border-gray-100 overflow-hidden flex-shrink-0">
                   <img 
                     src={ad.imageUrl} 
                     alt={ad.title} 
                     loading="eager"
                     decoding="async"
-                    className="w-full max-h-[260px] sm:max-h-[300px] object-contain rounded-2xl drop-shadow-sm transition-transform duration-300 hover:scale-[1.02]"
+                    className="w-full max-h-[260px] sm:max-h-[290px] object-contain rounded-2xl drop-shadow-sm transition-transform duration-300 hover:scale-[1.02]"
                     referrerPolicy="no-referrer"
                   />
-                  <div className="absolute top-3.5 left-3.5 bg-gradient-to-r from-red-600 to-[#ee4d2d] text-white font-black text-[10px] sm:text-[11px] uppercase tracking-wider px-2.5 py-1 rounded-full shadow-md flex items-center gap-1">
-                    <Flame className="w-3.5 h-3.5 fill-current text-yellow-300" />
-                    <span>Oferta Destaque</span>
-                  </div>
                 </div>
               )}
 
               {/* Body Content */}
               <div className="p-4 sm:p-5 flex flex-col gap-3 flex-1">
-                {/* Bloco de Preço & Economia (Altamente Conversivo) */}
+                {/* Bloco de Preço & Economia (Sem quebras de linha) */}
                 {(ad.price || ad.originalPrice) && (
-                  <div className="flex items-center justify-between bg-gradient-to-r from-orange-50/90 via-amber-50/70 to-orange-50/90 p-3 rounded-2xl border border-orange-200/80 shadow-xs">
-                    <div>
-                      <div className="text-[10px] font-bold text-orange-600 uppercase tracking-wider flex items-center gap-1">
-                        <Tag className="w-3 h-3 text-[#ee4d2d]" />
-                        <span>Preço Especial</span>
-                      </div>
-                      <div className="flex items-baseline gap-2 mt-0.5">
+                  <div className="bg-gradient-to-r from-orange-50/90 via-amber-50/70 to-orange-50/90 p-3.5 rounded-2xl border border-orange-200/80 shadow-xs flex flex-col gap-2">
+                    {/* Linha 1: Preço e Selo Frete Grátis */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-baseline gap-2">
                         {ad.price && (
-                          <span className="text-2xl sm:text-3xl font-black text-[#ee4d2d] tracking-tight">
+                          <span className="text-2xl sm:text-3xl font-black text-[#ee4d2d] tracking-tight whitespace-nowrap">
                             {ad.price}
                           </span>
                         )}
                         {ad.originalPrice && (
-                          <span className="text-xs sm:text-sm text-gray-400 font-semibold line-through">
+                          <span className="text-xs sm:text-sm text-gray-400 font-semibold line-through whitespace-nowrap">
                             {ad.originalPrice}
                           </span>
                         )}
                       </div>
+
+                      {/* Selo Frete Grátis em linha única */}
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-800 text-[11px] font-black rounded-xl whitespace-nowrap flex-shrink-0 shadow-2xs">
+                        <Truck className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                        <span className="whitespace-nowrap">Frete Grátis</span>
+                      </span>
                     </div>
 
-                    {/* Gatilhos de Benefício de Compra */}
-                    <div className="flex flex-col items-end gap-1">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-lg shadow-2xs">
-                        <Truck className="w-3 h-3 text-emerald-600" />
-                        <span>Frete Grátis</span>
+                    {/* Linha 2: Tags complementares sem quebra */}
+                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-orange-200/60 font-medium">
+                      <span className="text-orange-600 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1 whitespace-nowrap">
+                        <Tag className="w-3 h-3 text-[#ee4d2d] flex-shrink-0" />
+                        <span className="whitespace-nowrap">Preço Especial</span>
                       </span>
-                      <span className="text-[10px] text-gray-500 font-semibold flex items-center gap-0.5">
-                        <span className="text-amber-500 font-bold">★ 4.9</span> (Mais vendido)
+                      <span className="text-gray-600 font-semibold flex items-center gap-1 whitespace-nowrap">
+                        <span className="text-amber-500 font-bold">★ 4.9</span>
+                        <span className="text-gray-500 whitespace-nowrap">• Mais vendido</span>
                       </span>
                     </div>
                   </div>
@@ -734,15 +738,15 @@ export const Preview: React.FC<PreviewProps> = ({
                   )}
                 </div>
 
-                {/* Selos de Confiança que Ajudam a Vender */}
+                {/* Selos de Confiança (Sem quebra de linha) */}
                 <div className="grid grid-cols-2 gap-2 pt-0.5">
-                  <div className="flex items-center gap-1.5 p-2 rounded-xl bg-gray-50 border border-gray-100 text-[11px] font-medium text-gray-700">
-                    <span className="text-emerald-500 font-bold text-xs">✓</span>
-                    <span>Estoque Disponível</span>
+                  <div className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-gray-50 border border-gray-100 text-[11px] font-semibold text-gray-700 whitespace-nowrap">
+                    <span className="text-emerald-500 font-bold text-xs flex-shrink-0">✓</span>
+                    <span className="whitespace-nowrap">Em Estoque</span>
                   </div>
-                  <div className="flex items-center gap-1.5 p-2 rounded-xl bg-gray-50 border border-gray-100 text-[11px] font-medium text-gray-700">
-                    <span className="text-orange-500 font-bold text-xs">⚡</span>
-                    <span>Envio Rápido</span>
+                  <div className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-gray-50 border border-gray-100 text-[11px] font-semibold text-gray-700 whitespace-nowrap">
+                    <span className="text-orange-500 font-bold text-xs flex-shrink-0">⚡</span>
+                    <span className="whitespace-nowrap">Envio Imediato</span>
                   </div>
                 </div>
 
@@ -752,17 +756,17 @@ export const Preview: React.FC<PreviewProps> = ({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={handleAdCtaClick}
-                  className="w-full mt-1 py-3.5 px-4 bg-gradient-to-r from-[#ee4d2d] via-[#ff5722] to-[#ee4d2d] hover:brightness-105 text-white font-black text-sm sm:text-base rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 transition-all transform active:scale-[0.98] text-center cursor-pointer"
+                  className="w-full mt-1 py-3.5 px-4 bg-gradient-to-r from-[#ee4d2d] via-[#ff5722] to-[#ee4d2d] hover:brightness-105 text-white font-black text-sm sm:text-base rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 transition-all transform active:scale-[0.98] text-center cursor-pointer whitespace-nowrap"
                 >
                   <ShoppingBag className="w-5 h-5 flex-shrink-0" />
-                  <span className="truncate">{ad.buttonText || 'Aproveitar Oferta na Shopee'}</span>
+                  <span className="whitespace-nowrap truncate">{ad.buttonText || 'Aproveitar Oferta na Shopee'}</span>
                   <ExternalLink className="w-4 h-4 flex-shrink-0 opacity-85" />
                 </a>
 
                 {/* Safe Link Disclaimer */}
-                <div className="flex items-center justify-center gap-1.5 text-[11px] text-gray-400 pt-0.5">
+                <div className="flex items-center justify-center gap-1.5 text-[11px] text-gray-400 pt-0.5 whitespace-nowrap">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                  <span>Link Oficial • Compra 100% Protegida na Shopee</span>
+                  <span className="whitespace-nowrap">Link Oficial • Compra 100% Protegida</span>
                 </div>
               </div>
             </motion.div>
