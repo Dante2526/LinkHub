@@ -1459,39 +1459,6 @@ export const Editor: React.FC<EditorProps> = ({
                       Remover
                     </button>
                   </div>
-
-                  {/* Formato de Exibição da Imagem */}
-                  <div className="pt-2 border-t border-gray-100">
-                    <label className="text-xs font-semibold text-gray-700 block mb-1.5">
-                      Estilo da Foto no Pop-up
-                    </label>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => updateAd('imageFit', 'ambient')}
-                        className={`py-2 px-2.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer text-left flex flex-col ${
-                          (data.ad?.imageFit || 'ambient') === 'ambient'
-                            ? 'bg-orange-50 border-orange-300 text-[#ee4d2d]'
-                            : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
-                        }`}
-                      >
-                        <span>Preencher Laterais</span>
-                        <span className="text-[10px] font-normal opacity-75">Fundo com cores da foto</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => updateAd('imageFit', 'cover')}
-                        className={`py-2 px-2.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer text-left flex flex-col ${
-                          data.ad?.imageFit === 'cover'
-                            ? 'bg-orange-50 border-orange-300 text-[#ee4d2d]'
-                            : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
-                        }`}
-                      >
-                        <span>Cobrir Total</span>
-                        <span className="text-[10px] font-normal opacity-75">Estica de ponta a ponta</span>
-                      </button>
-                    </div>
-                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">

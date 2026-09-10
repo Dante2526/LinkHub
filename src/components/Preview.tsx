@@ -660,14 +660,14 @@ export const Preview: React.FC<PreviewProps> = ({
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               transition={{ type: "spring", stiffness: 350, damping: 25 }}
-              className="bg-white rounded-[26px] overflow-hidden w-full max-w-[340px] sm:max-w-[360px] shadow-2xl relative border border-gray-100 flex flex-col my-auto"
+              className="bg-white rounded-[28px] overflow-hidden w-full max-w-[340px] sm:max-w-sm shadow-2xl relative border border-gray-100 flex flex-col my-auto"
               style={{ color: '#000', fontFamily: 'system-ui, -apple-system, sans-serif' }}
             >
               {/* Top Bar with Badge and Countdown / Close Button */}
-              <div className="flex items-center justify-between px-3.5 py-2.5 bg-gradient-to-r from-orange-50/80 via-white to-orange-50/80 border-b border-orange-100/80 flex-shrink-0">
+              <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-orange-50/80 via-white to-orange-50/80 border-b border-orange-100/80 flex-shrink-0">
                 {/* Badge à esquerda com respiro */}
-                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[#ee4d2d] text-white text-[10px] sm:text-[11px] font-black rounded-full shadow-xs uppercase tracking-wider whitespace-nowrap flex-shrink-0">
-                  <Sparkles className="w-3 h-3 text-yellow-300 animate-pulse flex-shrink-0" />
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-[#ee4d2d] text-white text-[11px] font-black rounded-full shadow-xs uppercase tracking-wider whitespace-nowrap flex-shrink-0">
+                  <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-pulse flex-shrink-0" />
                   <span className="whitespace-nowrap">{ad.badgeText || 'Oferta Relâmpago'}</span>
                 </div>
 
@@ -692,103 +692,80 @@ export const Preview: React.FC<PreviewProps> = ({
                 </div>
               </div>
 
-              {/* Product Image / Banner - Preenchimento total e imersivo (sem laterais brancas vazias) */}
+              {/* Product Image / Banner - Adaptável 100% sem cortes e sem sobreposição */}
               {ad.imageUrl && (
-                <div className="relative w-full h-[175px] sm:h-[190px] bg-[#141517] flex items-center justify-center overflow-hidden border-b border-gray-100 flex-shrink-0">
-                  {ad.imageFit === 'cover' ? (
-                    <img 
-                      src={ad.imageUrl} 
-                      alt={ad.title} 
-                      loading="eager"
-                      decoding="async"
-                      className="w-full h-full object-cover transition-transform duration-300 hover:scale-[1.02]"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <>
-                      {/* Fundo expandido e desfocado que preenche 100% das laterais com a cor e luz da foto */}
-                      <img 
-                        src={ad.imageUrl} 
-                        alt="" 
-                        aria-hidden="true"
-                        className="absolute inset-0 w-full h-full object-cover blur-xl scale-135 opacity-75 filter brightness-90 pointer-events-none"
-                        referrerPolicy="no-referrer"
-                      />
-                      {/* Vinheta suave para fusão perfeita com as bordas */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/15 to-black/35 pointer-events-none z-[5]" />
-
-                      {/* Imagem do produto nítida, completa e centralizada com sombra 3D */}
-                      <img 
-                        src={ad.imageUrl} 
-                        alt={ad.title} 
-                        loading="eager"
-                        decoding="async"
-                        className="relative z-10 h-full w-auto max-w-full object-contain p-2 drop-shadow-[0_10px_20px_rgba(0,0,0,0.6)] transition-transform duration-300 hover:scale-[1.02]"
-                        referrerPolicy="no-referrer"
-                      />
-                    </>
-                  )}
+                <div className="relative w-full bg-gradient-to-b from-orange-50/20 via-white to-gray-50/40 flex items-center justify-center p-3 sm:p-4 border-b border-gray-100 overflow-hidden flex-shrink-0">
+                  <img 
+                    src={ad.imageUrl} 
+                    alt={ad.title} 
+                    loading="eager"
+                    decoding="async"
+                    className="w-full max-h-[235px] sm:max-h-[260px] object-contain rounded-2xl drop-shadow-sm transition-transform duration-300 hover:scale-[1.02]"
+                    referrerPolicy="no-referrer"
+                  />
                 </div>
               )}
 
-              {/* Body Content - Proporcional, vendedor e sem cortes */}
-              <div className="p-3 sm:p-3.5 flex flex-col gap-2 flex-1">
+              {/* Body Content */}
+              <div className="p-4 sm:p-5 flex flex-col gap-3 flex-1">
                 {/* Bloco de Preço & Economia */}
                 {(ad.price || ad.originalPrice) && (
-                  <div className="bg-gradient-to-r from-orange-50/90 via-amber-50/60 to-orange-50/90 px-3 py-2 rounded-xl border border-orange-200/80 shadow-xs flex flex-col gap-1">
+                  <div className="bg-gradient-to-r from-orange-50 via-amber-50/50 to-orange-50 p-3 rounded-2xl border border-orange-200/80 shadow-xs flex flex-col gap-2">
+                    {/* Linha 1: Tag de Oferta e Selo Frete Grátis com espaço de sobra */}
                     <div className="flex items-center justify-between">
-                      <div className="flex items-baseline gap-2">
-                        {ad.price && (
-                          <span className="text-xl sm:text-2xl font-black text-[#ee4d2d] tracking-tight whitespace-nowrap">
-                            {ad.price}
-                          </span>
-                        )}
-                        {ad.originalPrice && (
-                          <span className="text-xs text-gray-400 font-semibold line-through whitespace-nowrap">
-                            {ad.originalPrice}
-                          </span>
-                        )}
-                      </div>
+                      <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-black text-[#ee4d2d] uppercase tracking-wider whitespace-nowrap">
+                        <Tag className="w-3 h-3 text-[#ee4d2d] flex-shrink-0" />
+                        <span>Preço Especial</span>
+                      </span>
 
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-lg whitespace-nowrap shadow-2xs">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[10px] sm:text-[11px] font-black rounded-lg whitespace-nowrap shadow-2xs">
                         <Truck className="w-3 h-3 text-emerald-600 flex-shrink-0" />
                         <span>Frete Grátis</span>
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between text-[10px] sm:text-[11px] pt-1 border-t border-orange-200/50 font-medium text-gray-500">
-                      <span className="text-orange-600 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1">
-                        <Tag className="w-3 h-3 text-[#ee4d2d]" />
-                        <span>Preço Especial</span>
-                      </span>
-                      <span className="flex items-center gap-1 font-semibold text-gray-600">
-                        <span className="text-amber-500 font-bold">★ 4.9</span>
-                        <span>• Mais de 1.000 vendidos</span>
-                      </span>
+                    {/* Linha 2: Valores do Preço com largura total e destaque */}
+                    <div className="flex items-baseline gap-2">
+                      {ad.price && (
+                        <span className="text-2xl sm:text-3xl font-black text-[#ee4d2d] tracking-tight whitespace-nowrap">
+                          {ad.price}
+                        </span>
+                      )}
+                      {ad.originalPrice && (
+                        <span className="text-xs sm:text-sm text-gray-400 font-semibold line-through whitespace-nowrap">
+                          {ad.originalPrice}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Linha 3: Prova social e volume de vendas */}
+                    <div className="flex items-center gap-1 text-[11px] text-gray-500 pt-1 border-t border-orange-200/50 font-medium">
+                      <span className="text-amber-500 font-bold">★ 4.9</span>
+                      <span className="text-gray-500 whitespace-nowrap">• Mais de 1.000 vendidos</span>
                     </div>
                   </div>
                 )}
 
                 <div>
-                  <h3 className="text-sm sm:text-base font-bold text-gray-900 leading-snug line-clamp-1">
+                  <h3 className="text-base sm:text-lg font-bold text-gray-900 leading-snug">
                     {ad.title}
                   </h3>
                   {ad.description && (
-                    <p className="text-[11px] sm:text-xs text-gray-600 mt-0.5 leading-snug line-clamp-1">
+                    <p className="text-xs sm:text-sm text-gray-600 mt-1 leading-relaxed">
                       {ad.description}
                     </p>
                   )}
                 </div>
 
-                {/* Selos de Confiança */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-gray-50 border border-gray-100 text-[10px] sm:text-[11px] font-semibold text-gray-700 whitespace-nowrap">
+                {/* Selos de Confiança (Sem quebra de linha) */}
+                <div className="grid grid-cols-2 gap-2 pt-0.5">
+                  <div className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-gray-50 border border-gray-100 text-[11px] font-semibold text-gray-700 whitespace-nowrap">
                     <span className="text-emerald-500 font-bold text-xs flex-shrink-0">✓</span>
-                    <span>Em Estoque</span>
+                    <span className="whitespace-nowrap">Em Estoque</span>
                   </div>
-                  <div className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-gray-50 border border-gray-100 text-[10px] sm:text-[11px] font-semibold text-gray-700 whitespace-nowrap">
+                  <div className="flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl bg-gray-50 border border-gray-100 text-[11px] font-semibold text-gray-700 whitespace-nowrap">
                     <span className="text-orange-500 font-bold text-xs flex-shrink-0">⚡</span>
-                    <span>Envio Imediato</span>
+                    <span className="whitespace-nowrap">Envio Imediato</span>
                   </div>
                 </div>
 
@@ -798,17 +775,17 @@ export const Preview: React.FC<PreviewProps> = ({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={handleAdCtaClick}
-                  className="w-full py-2.5 sm:py-3 px-4 bg-gradient-to-r from-[#ee4d2d] via-[#ff5722] to-[#ee4d2d] hover:brightness-105 text-white font-black text-sm rounded-xl flex items-center justify-center gap-2 shadow-md shadow-orange-500/25 transition-all transform active:scale-[0.98] text-center cursor-pointer whitespace-nowrap"
+                  className="w-full mt-1 py-3.5 px-4 bg-gradient-to-r from-[#ee4d2d] via-[#ff5722] to-[#ee4d2d] hover:brightness-105 text-white font-black text-sm sm:text-base rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 transition-all transform active:scale-[0.98] text-center cursor-pointer whitespace-nowrap"
                 >
-                  <ShoppingBag className="w-4 h-4 flex-shrink-0" />
+                  <ShoppingBag className="w-5 h-5 flex-shrink-0" />
                   <span className="whitespace-nowrap truncate">{ad.buttonText || 'Aproveitar Oferta na Shopee'}</span>
-                  <ExternalLink className="w-3.5 h-3.5 flex-shrink-0 opacity-85" />
+                  <ExternalLink className="w-4 h-4 flex-shrink-0 opacity-85" />
                 </a>
 
-                {/* Disclaimer de Compra Segura */}
-                <div className="flex items-center justify-center gap-1 text-[10px] text-gray-400 whitespace-nowrap">
+                {/* Safe Link Disclaimer */}
+                <div className="flex items-center justify-center gap-1.5 text-[11px] text-gray-400 pt-0.5 whitespace-nowrap">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                  <span>Link Oficial • Compra 100% Protegida</span>
+                  <span className="whitespace-nowrap">Link Oficial • Compra 100% Protegida</span>
                 </div>
               </div>
             </motion.div>
