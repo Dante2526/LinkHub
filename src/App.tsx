@@ -4,7 +4,8 @@ import { doc, onSnapshot, setDoc, collection, addDoc } from 'firebase/firestore'
 import { db, isFirebaseConfigured } from './lib/firebase';
 import { AppData, defaultTheme, defaultProfile, defaultLinks, defaultAd, BackgroundPosition } from './types';
 import { Preview } from './components/Preview';
-import { Smartphone, Monitor, ExternalLink, Loader2 } from 'lucide-react';
+import { Smartphone, Monitor, ExternalLink, Loader2, LogOut } from 'lucide-react';
+import { checkIsAdminAuthorized } from './components/Login';
 
 const LazyEditor = lazy(() => import('./components/Editor').then(m => ({ default: m.Editor })));
 const LazyLogin = lazy(() => import('./components/Login').then(m => ({ default: m.Login })));
@@ -39,7 +40,19 @@ const getInitialData = (): AppData | null => {
 const MemoizedEditor = React.memo(LazyEditor);
 const MemoizedPreview = React.memo(Preview);
 
-function AdminView({ data, setData, onLinkClick }: { data: AppData, setData: (d: AppData) => void, onLinkClick: (id: string) => void }) {
+function AdminView({ 
+  data, 
+  setData, 
+  onLinkClick,
+  adminEmail,
+  onLogout,
+}: { 
+  data: AppData; 
+  setData: (d: AppData) => void; 
+  onLinkClick: (id: string) => void;
+  adminEmail?: string | null;
+  onLogout?: () => void;
+}) {
   const [previewMode, setPreviewMode] = useState<'mobile' | 'desktop'>('mobile');
   const [showMobilePreview, setShowMobilePreview] = useState(false);
   const [isRepositioning, setIsRepositioning] = useState(false);
@@ -60,17 +73,35 @@ function AdminView({ data, setData, onLinkClick }: { data: AppData, setData: (d:
       {/* Editor Panel (Left) */}
       <div className={`w-full md:w-[450px] lg:w-[500px] h-full flex-shrink-0 flex-col z-10 bg-gray-50 border-r border-gray-200 ${showMobilePreview ? 'hidden md:flex' : 'flex'}`}>
         <div className="pt-12 md:pt-16 pb-6 px-6 md:px-8 flex items-center justify-between flex-shrink-0">
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-black">LinkHub</h1>
+          <div className="flex flex-col">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-black">LinkHub</h1>
+            {adminEmail && (
+              <span className="text-[11px] text-gray-400 font-medium truncate max-w-[170px] sm:max-w-[220px]" title={adminEmail}>
+                {adminEmail}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <button 
               onClick={() => setShowMobilePreview(true)}
-              className="md:hidden flex items-center gap-2 px-4 py-2 bg-indigo-100 text-indigo-700 rounded-full text-sm font-semibold hover:bg-indigo-200 transition-colors"
+              className="md:hidden flex items-center gap-1.5 px-3 py-2 bg-indigo-100 text-indigo-700 rounded-full text-xs font-semibold hover:bg-indigo-200 transition-colors"
             >
-              <Smartphone className="w-4 h-4" /> Ver
+              <Smartphone className="w-3.5 h-3.5" /> Ver
             </button>
-            <a href={window.location.hostname.includes('localhost') ? '/' : `https://${window.location.hostname.replace('-adm', '')}`} target="_blank" rel="noreferrer" className="hidden md:flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold hover:bg-blue-200 transition-colors">
-              Público <ExternalLink className="w-4 h-4" />
+            <a href={window.location.hostname.includes('localhost') ? '/' : `https://${window.location.hostname.replace('-adm', '')}`} target="_blank" rel="noreferrer" className="hidden sm:flex items-center gap-1.5 px-3 py-2 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold hover:bg-blue-200 transition-colors">
+              Público <ExternalLink className="w-3.5 h-3.5" />
             </a>
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                title="Sair do painel administrativo"
+                className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-red-50 text-gray-700 hover:text-red-600 rounded-full text-xs font-semibold transition-all border border-gray-200 hover:border-red-200 cursor-pointer shadow-xs"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Sair</span>
+              </button>
+            )}
           </div>
         </div>
         <div className="flex-1 overflow-hidden">
@@ -281,6 +312,23 @@ export default function App() {
 
   const isAdminDomain = window.location.hostname.includes('-adm');
 
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('linkhub_admin_email');
+    setAdminEmail(null);
+  }, []);
+
+  // Revalida se o e-mail ativo ainda consta na coleção 'administradores' no Firestore
+  useEffect(() => {
+    if (adminEmail && isFirebaseConfigured) {
+      checkIsAdminAuthorized(adminEmail).then(res => {
+        if (!res.authorized) {
+          console.warn('Sessão administrativa expirada ou revogada no Firebase:', res.reason);
+          handleLogout();
+        }
+      }).catch(console.error);
+    }
+  }, [adminEmail, handleLogout]);
+
   const handleLogin = (email: string) => {
     localStorage.setItem('linkhub_admin_email', email);
     setAdminEmail(email);
@@ -298,7 +346,15 @@ export default function App() {
         </Suspense>
       );
     }
-    return <AdminView data={data} setData={handleUpdateData} onLinkClick={() => {}} />;
+    return (
+      <AdminView 
+        data={data} 
+        setData={handleUpdateData} 
+        onLinkClick={() => {}} 
+        adminEmail={adminEmail}
+        onLogout={handleLogout}
+      />
+    );
   };
 
   if (loading || !data) {

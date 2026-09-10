@@ -1,0 +1,41 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Perfil público: qualquer visitante pode ler; gravação permitida para atualizar dados
+    match /perfis/{perfilId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Métricas de cliques: visitantes podem registrar cliques; leitura liberada para o painel de estatísticas
+    match /cliques/{cliqueId} {
+      allow create: if true;
+      allow read: if true;
+      allow update, delete: if true;
+    }
+
+    // Métricas de visualizações: visitantes podem registrar acessos; leitura para o painel de estatísticas
+    match /visualizacoes/{visId} {
+      allow create: if true;
+      allow read: if true;
+      allow update, delete: if true;
+    }
+
+    // Chunks de mídias pesadas (vídeos e fotos de alta resolução particionados)
+    match /media_chunks/{chunkId} {
+      allow read, write: if true;
+    }
+
+    // Administradores autorizados: consulta para autenticação no painel administrativo
+    match /administradores/{adminDoc} {
+      allow read, write: if true;
+    }
+
+    // Regra padrão de fallback
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
