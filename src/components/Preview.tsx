@@ -5,6 +5,7 @@ import { db, isFirebaseConfigured } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
+import { getCachedVideoBlob, setCachedVideoBlob } from '../lib/videoCache';
 
 interface PreviewProps {
   data: AppData;
@@ -163,6 +164,7 @@ export const Preview: React.FC<PreviewProps> = ({
   const isAnimated = theme.backgroundType === 'animated-gradient';
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string | null>(null);
+  const [isVideoReady, setIsVideoReady] = useState(false);
 
   // Responsive device mode detection for PublicView or dynamic window sizes
   const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1024);
@@ -286,6 +288,7 @@ export const Preview: React.FC<PreviewProps> = ({
     const url = theme.backgroundVideoUrl;
     let objectUrl: string | null = null;
     let isMounted = true;
+    setIsVideoReady(false);
     
     if (url && url.startsWith('firestore_chunked|')) {
       if (!isFirebaseConfigured) {
@@ -293,11 +296,23 @@ export const Preview: React.FC<PreviewProps> = ({
         return;
       }
 
-      // Check cache first for instant 0ms playback
+      // 1. Check in-memory cache first for instant 0ms playback
       if (videoBlobCache.has(url)) {
         setResolvedVideoUrl(videoBlobCache.get(url)!);
         return;
       }
+
+      // 2. Check persistent IndexedDB cache (0-15ms local disk playback on repeat visits)
+      let isCachedResolved = false;
+      getCachedVideoBlob(url).then((cachedBlob) => {
+        if (!isMounted) return;
+        if (cachedBlob) {
+          isCachedResolved = true;
+          objectUrl = URL.createObjectURL(cachedBlob);
+          videoBlobCache.set(url, objectUrl);
+          setResolvedVideoUrl(objectUrl);
+        }
+      }).catch(() => {});
 
       const [, fileId, chunksStr] = url.split('|');
       const totalChunks = parseInt(chunksStr, 10);
@@ -317,9 +332,11 @@ export const Preview: React.FC<PreviewProps> = ({
             }
           }
 
-          if (isMounted && base64String) {
+          if (isMounted && base64String && !isCachedResolved) {
              const res = await fetch(base64String);
              const blob = await res.blob();
+             // Cache in IndexedDB for instant future visits
+             setCachedVideoBlob(url, blob);
              objectUrl = URL.createObjectURL(blob);
              videoBlobCache.set(url, objectUrl);
              setResolvedVideoUrl(objectUrl);
@@ -346,7 +363,7 @@ export const Preview: React.FC<PreviewProps> = ({
       className={`relative w-full h-full overflow-hidden ${isAnimated ? 'animated-gradient-bg' : ''}`} 
       style={{ ...getBackgroundStyle(theme, activePosition), fontFamily: theme.fontFamily }}
     >
-      {/* Video Background Layer (strictly contained within the preview frame) */}
+      {/* Video Background Layer (alta prioridade, preload e transição suave por GPU) */}
       {theme.backgroundType === 'video' && resolvedVideoUrl && (
         <video 
           key={resolvedVideoUrl}
@@ -354,7 +371,11 @@ export const Preview: React.FC<PreviewProps> = ({
           loop 
           muted 
           playsInline
-          className="absolute inset-0 w-full h-full object-cover pointer-events-none z-0"
+          preload="auto"
+          poster={theme.backgroundImageUrl || undefined}
+          onLoadedData={() => setIsVideoReady(true)}
+          onCanPlay={() => setIsVideoReady(true)}
+          className={`absolute inset-0 w-full h-full object-cover pointer-events-none z-0 transition-opacity duration-700 ease-out ${isVideoReady ? 'opacity-100' : 'opacity-0'}`}
           style={{ objectPosition: `${activePosition.x}% ${activePosition.y}%` }}
         >
           <source src={resolvedVideoUrl} />
