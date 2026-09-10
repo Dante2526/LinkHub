@@ -639,32 +639,31 @@ export const Preview: React.FC<PreviewProps> = ({
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               transition={{ type: "spring", stiffness: 350, damping: 25 }}
-              className="bg-white rounded-[28px] overflow-hidden w-full max-w-sm shadow-2xl relative border border-gray-100 flex flex-col my-auto max-h-[94vh] overflow-y-auto"
+              className="bg-white rounded-[28px] overflow-hidden w-full max-w-[340px] sm:max-w-sm shadow-2xl relative border border-gray-100 flex flex-col my-auto max-h-[92vh] overflow-y-auto"
               style={{ color: '#000', fontFamily: 'system-ui, -apple-system, sans-serif' }}
             >
               {/* Top Bar with Badge and Countdown / Close Button */}
-              <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-orange-50/80 via-white to-orange-50/80 border-b border-orange-100 flex-shrink-0">
-                {/* Badge à esquerda com whitespace-nowrap e respiro */}
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#ee4d2d] text-white text-[11px] font-black rounded-full shadow-xs uppercase tracking-wider whitespace-nowrap flex-shrink-0">
-                  <Sparkles className="w-3.5 h-3.5 text-yellow-300 animate-pulse flex-shrink-0" />
+              <div className="flex items-center justify-between px-3.5 py-2.5 bg-gradient-to-r from-orange-50/80 via-white to-orange-50/80 border-b border-orange-100/80 flex-shrink-0">
+                {/* Badge à esquerda com respiro */}
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[#ee4d2d] text-white text-[10px] sm:text-[11px] font-black rounded-full shadow-xs uppercase tracking-wider whitespace-nowrap flex-shrink-0">
+                  <Sparkles className="w-3 h-3 text-yellow-300 animate-pulse flex-shrink-0" />
                   <span className="whitespace-nowrap">{ad.badgeText || 'Oferta Relâmpago'}</span>
                 </div>
 
-                {/* Botão fechar / temporizador à direita com espaçamento livre */}
-                <div className="flex items-center flex-shrink-0 pl-4">
+                {/* Contador circular compacto (não quebra nem corta na tela) */}
+                <div className="flex items-center flex-shrink-0">
                   {adCountdown > 0 ? (
                     <div 
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900/85 text-white rounded-full text-xs font-bold select-none cursor-not-allowed border border-gray-700 whitespace-nowrap"
-                      title={`Aguarde ${adCountdown} segundos para poder fechar`}
+                      className="w-7 h-7 rounded-full bg-gray-900 text-white flex items-center justify-center text-xs font-black shadow-xs select-none border border-gray-700 flex-shrink-0"
+                      title={`Aguarde ${adCountdown}s para poder fechar`}
                     >
-                      <Clock className="w-3.5 h-3.5 text-orange-400 animate-spin flex-shrink-0" />
-                      <span className="whitespace-nowrap">Aguarde {adCountdown}s</span>
+                      {adCountdown}s
                     </div>
                   ) : (
                     <button
                       onClick={handleCloseAd}
                       title="Fechar anúncio"
-                      className="flex items-center justify-center w-8 h-8 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-600 hover:text-gray-900 rounded-full transition-all cursor-pointer shadow-xs active:scale-95 flex-shrink-0"
+                      className="flex items-center justify-center w-7 h-7 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 rounded-full transition-all cursor-pointer shadow-xs active:scale-95 flex-shrink-0"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -680,7 +679,7 @@ export const Preview: React.FC<PreviewProps> = ({
                     alt={ad.title} 
                     loading="eager"
                     decoding="async"
-                    className="w-full max-h-[260px] sm:max-h-[290px] object-contain rounded-2xl drop-shadow-sm transition-transform duration-300 hover:scale-[1.02]"
+                    className="w-full max-h-[250px] sm:max-h-[280px] object-contain rounded-2xl drop-shadow-sm transition-transform duration-300 hover:scale-[1.02]"
                     referrerPolicy="no-referrer"
                   />
                 </div>
@@ -688,41 +687,40 @@ export const Preview: React.FC<PreviewProps> = ({
 
               {/* Body Content */}
               <div className="p-4 sm:p-5 flex flex-col gap-3 flex-1">
-                {/* Bloco de Preço & Economia (Sem quebras de linha) */}
+                {/* Bloco de Preço & Economia (Layout à prova de overflow em qualquer tela) */}
                 {(ad.price || ad.originalPrice) && (
-                  <div className="bg-gradient-to-r from-orange-50/90 via-amber-50/70 to-orange-50/90 p-3.5 rounded-2xl border border-orange-200/80 shadow-xs flex flex-col gap-2">
-                    {/* Linha 1: Preço e Selo Frete Grátis */}
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-baseline gap-2">
-                        {ad.price && (
-                          <span className="text-2xl sm:text-3xl font-black text-[#ee4d2d] tracking-tight whitespace-nowrap">
-                            {ad.price}
-                          </span>
-                        )}
-                        {ad.originalPrice && (
-                          <span className="text-xs sm:text-sm text-gray-400 font-semibold line-through whitespace-nowrap">
-                            {ad.originalPrice}
-                          </span>
-                        )}
-                      </div>
+                  <div className="bg-gradient-to-r from-orange-50 via-amber-50/50 to-orange-50 p-3 rounded-2xl border border-orange-200/80 shadow-xs flex flex-col gap-2">
+                    {/* Linha 1: Tag de Oferta e Selo Frete Grátis com espaço de sobra */}
+                    <div className="flex items-center justify-between">
+                      <span className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-black text-[#ee4d2d] uppercase tracking-wider whitespace-nowrap">
+                        <Tag className="w-3 h-3 text-[#ee4d2d] flex-shrink-0" />
+                        <span>Preço Especial</span>
+                      </span>
 
-                      {/* Selo Frete Grátis em linha única */}
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-800 text-[11px] font-black rounded-xl whitespace-nowrap flex-shrink-0 shadow-2xs">
-                        <Truck className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                        <span className="whitespace-nowrap">Frete Grátis</span>
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[10px] sm:text-[11px] font-black rounded-lg whitespace-nowrap shadow-2xs">
+                        <Truck className="w-3 h-3 text-emerald-600 flex-shrink-0" />
+                        <span>Frete Grátis</span>
                       </span>
                     </div>
 
-                    {/* Linha 2: Tags complementares sem quebra */}
-                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-orange-200/60 font-medium">
-                      <span className="text-orange-600 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1 whitespace-nowrap">
-                        <Tag className="w-3 h-3 text-[#ee4d2d] flex-shrink-0" />
-                        <span className="whitespace-nowrap">Preço Especial</span>
-                      </span>
-                      <span className="text-gray-600 font-semibold flex items-center gap-1 whitespace-nowrap">
-                        <span className="text-amber-500 font-bold">★ 4.9</span>
-                        <span className="text-gray-500 whitespace-nowrap">• Mais vendido</span>
-                      </span>
+                    {/* Linha 2: Valores do Preço com largura total e destaque */}
+                    <div className="flex items-baseline gap-2">
+                      {ad.price && (
+                        <span className="text-2xl sm:text-3xl font-black text-[#ee4d2d] tracking-tight whitespace-nowrap">
+                          {ad.price}
+                        </span>
+                      )}
+                      {ad.originalPrice && (
+                        <span className="text-xs sm:text-sm text-gray-400 font-semibold line-through whitespace-nowrap">
+                          {ad.originalPrice}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Linha 3: Prova social e volume de vendas */}
+                    <div className="flex items-center gap-1 text-[11px] text-gray-500 pt-1 border-t border-orange-200/50 font-medium">
+                      <span className="text-amber-500 font-bold">★ 4.9</span>
+                      <span className="text-gray-500 whitespace-nowrap">• Mais de 1.000 vendidos</span>
                     </div>
                   </div>
                 )}
