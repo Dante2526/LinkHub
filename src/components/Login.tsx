@@ -69,7 +69,7 @@ export async function checkIsAdminAuthorized(email: string): Promise<AdminAuthRe
       if (allAdmins.empty) {
         return {
           authorized: false,
-          reason: `A coleção "administradores" ainda está vazia no Firebase. Adicione um documento com seu e-mail ("${normalized}") para liberar o acesso.`
+          reason: 'Acesso negado: Nenhum administrador cadastrado no momento.'
         };
       }
 
@@ -85,7 +85,7 @@ export async function checkIsAdminAuthorized(email: string): Promise<AdminAuthRe
         if (docData?.ativo === false) {
           return { 
             authorized: false, 
-            reason: 'Acesso bloqueado: Este e-mail administrativo foi desativado no Firebase.' 
+            reason: 'Acesso bloqueado: Este e-mail administrativo está desativado.' 
           };
         }
         return { authorized: true };
@@ -96,22 +96,14 @@ export async function checkIsAdminAuthorized(email: string): Promise<AdminAuthRe
 
     return {
       authorized: false,
-      reason: `Acesso negado: O e-mail "${normalized}" não foi encontrado na coleção "administradores" do Firestore.`
+      reason: `Acesso negado: O e-mail "${normalized}" não possui permissão de administrador.`
     };
   } catch (error: any) {
-    console.error('Erro ao verificar permissão de administrador no Firestore:', error);
+    console.error('Erro ao verificar permissão:', error);
     
-    // Tratamento de regras do Firebase
-    if (error?.code === 'permission-denied') {
-      return {
-        authorized: false,
-        reason: 'Permissão negada no Firebase. Certifique-se de que a regra da coleção "administradores" permite leitura nas Regras do Firestore.'
-      };
-    }
-
     return {
       authorized: false,
-      reason: `Falha ao consultar permissões no Firebase (${error?.message || 'Erro de conexão'}). Tente novamente.`
+      reason: 'Erro ao verificar credenciais. Verifique a sua conexão e tente novamente.'
     };
   }
 }
@@ -211,7 +203,7 @@ export function Login({ onLogin }: LoginProps) {
                 {loading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    <span>Verificando no Firebase...</span>
+                    <span>Verificando...</span>
                   </>
                 ) : (
                   <>
@@ -222,11 +214,6 @@ export function Login({ onLogin }: LoginProps) {
               </button>
             </div>
           </form>
-
-          <div className="mt-6 pt-5 border-t border-gray-100 flex items-center justify-center gap-2 text-xs text-gray-500">
-            <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-            <span>Validação direta na coleção <strong>administradores</strong></span>
-          </div>
         </div>
       </div>
     </div>

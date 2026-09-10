@@ -57,6 +57,15 @@ function AdminView({
   const [showMobilePreview, setShowMobilePreview] = useState(false);
   const [isRepositioning, setIsRepositioning] = useState(false);
 
+  // Ao clicar em "Testar Pop-up", alterna instantaneamente para o Preview no celular
+  useEffect(() => {
+    const handleTrigger = () => {
+      setShowMobilePreview(true);
+    };
+    window.addEventListener('linkhub_trigger_ad_preview', handleTrigger);
+    return () => window.removeEventListener('linkhub_trigger_ad_preview', handleTrigger);
+  }, []);
+
   const handlePositionChange = (pos: BackgroundPosition) => {
     const field = previewMode === 'mobile' ? 'backgroundPositionMobile' : 'backgroundPositionDesktop';
     setData({
