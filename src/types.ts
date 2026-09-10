@@ -53,7 +53,6 @@ export interface Advertisement {
   title: string;
   description: string;
   imageUrl?: string;
-  imageFit?: 'ambient' | 'cover';
   badgeText?: string;
   buttonText: string;
   buttonUrl: string;
@@ -76,7 +75,6 @@ export const defaultAd: Advertisement = {
   title: 'Achadinho Exclusivo na Shopee!',
   description: 'Aproveite esta oferta especial com super desconto e frete grátis por tempo limitado.',
   imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80',
-  imageFit: 'ambient',
   badgeText: 'Achadinho Shopee 🔥',
   buttonText: 'Aproveitar na Shopee',
   buttonUrl: 'https://shopee.com.br',
