@@ -692,55 +692,71 @@ export const Preview: React.FC<PreviewProps> = ({
                 </div>
               </div>
 
-              {/* Product Image / Banner - Destaque amplo com ambient backdrop (sem faixas brancas vazias) */}
+              {/* Product Image / Banner - Preenchimento total e imersivo (sem laterais brancas vazias) */}
               {ad.imageUrl && (
-                <div className="relative w-full h-[195px] sm:h-[215px] bg-gradient-to-b from-orange-50/30 via-white to-gray-50 flex items-center justify-center overflow-hidden border-b border-gray-100 flex-shrink-0">
-                  {/* Backdrop suave que preenche o container harmoniosamente com as cores do produto */}
-                  <img 
-                    src={ad.imageUrl} 
-                    alt="" 
-                    aria-hidden="true"
-                    className="absolute inset-0 w-full h-full object-cover blur-2xl scale-125 opacity-20 pointer-events-none"
-                    referrerPolicy="no-referrer"
-                  />
-                  {/* Imagem do produto nítida e em destaque */}
-                  <img 
-                    src={ad.imageUrl} 
-                    alt={ad.title} 
-                    loading="eager"
-                    decoding="async"
-                    className="relative z-10 h-full w-auto max-w-full object-contain p-2 drop-shadow-md transition-transform duration-300 hover:scale-[1.02]"
-                    referrerPolicy="no-referrer"
-                  />
+                <div className="relative w-full h-[175px] sm:h-[190px] bg-[#141517] flex items-center justify-center overflow-hidden border-b border-gray-100 flex-shrink-0">
+                  {ad.imageFit === 'cover' ? (
+                    <img 
+                      src={ad.imageUrl} 
+                      alt={ad.title} 
+                      loading="eager"
+                      decoding="async"
+                      className="w-full h-full object-cover transition-transform duration-300 hover:scale-[1.02]"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <>
+                      {/* Fundo expandido e desfocado que preenche 100% das laterais com a cor e luz da foto */}
+                      <img 
+                        src={ad.imageUrl} 
+                        alt="" 
+                        aria-hidden="true"
+                        className="absolute inset-0 w-full h-full object-cover blur-xl scale-135 opacity-75 filter brightness-90 pointer-events-none"
+                        referrerPolicy="no-referrer"
+                      />
+                      {/* Vinheta suave para fusão perfeita com as bordas */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/15 to-black/35 pointer-events-none z-[5]" />
+
+                      {/* Imagem do produto nítida, completa e centralizada com sombra 3D */}
+                      <img 
+                        src={ad.imageUrl} 
+                        alt={ad.title} 
+                        loading="eager"
+                        decoding="async"
+                        className="relative z-10 h-full w-auto max-w-full object-contain p-2 drop-shadow-[0_10px_20px_rgba(0,0,0,0.6)] transition-transform duration-300 hover:scale-[1.02]"
+                        referrerPolicy="no-referrer"
+                      />
+                    </>
+                  )}
                 </div>
               )}
 
-              {/* Body Content - Proporcional, vendedor e sem scroll interno */}
-              <div className="p-3.5 sm:p-4 flex flex-col gap-2.5 flex-1">
+              {/* Body Content - Proporcional, vendedor e sem cortes */}
+              <div className="p-3 sm:p-3.5 flex flex-col gap-2 flex-1">
                 {/* Bloco de Preço & Economia */}
                 {(ad.price || ad.originalPrice) && (
-                  <div className="bg-gradient-to-r from-orange-50/90 via-amber-50/60 to-orange-50/90 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-2xl border border-orange-200/80 shadow-xs flex flex-col gap-1.5">
+                  <div className="bg-gradient-to-r from-orange-50/90 via-amber-50/60 to-orange-50/90 px-3 py-2 rounded-xl border border-orange-200/80 shadow-xs flex flex-col gap-1">
                     <div className="flex items-center justify-between">
                       <div className="flex items-baseline gap-2">
                         {ad.price && (
-                          <span className="text-2xl sm:text-[26px] font-black text-[#ee4d2d] tracking-tight whitespace-nowrap">
+                          <span className="text-xl sm:text-2xl font-black text-[#ee4d2d] tracking-tight whitespace-nowrap">
                             {ad.price}
                           </span>
                         )}
                         {ad.originalPrice && (
-                          <span className="text-xs sm:text-sm text-gray-400 font-semibold line-through whitespace-nowrap">
+                          <span className="text-xs text-gray-400 font-semibold line-through whitespace-nowrap">
                             {ad.originalPrice}
                           </span>
                         )}
                       </div>
 
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[10px] sm:text-[11px] font-black rounded-lg whitespace-nowrap shadow-2xs">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-lg whitespace-nowrap shadow-2xs">
                         <Truck className="w-3 h-3 text-emerald-600 flex-shrink-0" />
                         <span>Frete Grátis</span>
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between text-[11px] pt-1 border-t border-orange-200/50 font-medium text-gray-500">
+                    <div className="flex items-center justify-between text-[10px] sm:text-[11px] pt-1 border-t border-orange-200/50 font-medium text-gray-500">
                       <span className="text-orange-600 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1">
                         <Tag className="w-3 h-3 text-[#ee4d2d]" />
                         <span>Preço Especial</span>
@@ -754,23 +770,23 @@ export const Preview: React.FC<PreviewProps> = ({
                 )}
 
                 <div>
-                  <h3 className="text-base font-bold text-gray-900 leading-snug">
+                  <h3 className="text-sm sm:text-base font-bold text-gray-900 leading-snug line-clamp-1">
                     {ad.title}
                   </h3>
                   {ad.description && (
-                    <p className="text-xs text-gray-600 mt-1 leading-relaxed line-clamp-2">
+                    <p className="text-[11px] sm:text-xs text-gray-600 mt-0.5 leading-snug line-clamp-1">
                       {ad.description}
                     </p>
                   )}
                 </div>
 
-                {/* Selos de Confiança (Dois blocos limpos lado a lado) */}
+                {/* Selos de Confiança */}
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-xl bg-gray-50 border border-gray-100 text-[11px] font-semibold text-gray-700 whitespace-nowrap">
+                  <div className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-gray-50 border border-gray-100 text-[10px] sm:text-[11px] font-semibold text-gray-700 whitespace-nowrap">
                     <span className="text-emerald-500 font-bold text-xs flex-shrink-0">✓</span>
                     <span>Em Estoque</span>
                   </div>
-                  <div className="flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded-xl bg-gray-50 border border-gray-100 text-[11px] font-semibold text-gray-700 whitespace-nowrap">
+                  <div className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-gray-50 border border-gray-100 text-[10px] sm:text-[11px] font-semibold text-gray-700 whitespace-nowrap">
                     <span className="text-orange-500 font-bold text-xs flex-shrink-0">⚡</span>
                     <span>Envio Imediato</span>
                   </div>
@@ -782,11 +798,11 @@ export const Preview: React.FC<PreviewProps> = ({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={handleAdCtaClick}
-                  className="w-full py-3 px-4 bg-gradient-to-r from-[#ee4d2d] via-[#ff5722] to-[#ee4d2d] hover:brightness-105 text-white font-black text-sm sm:text-base rounded-2xl flex items-center justify-center gap-2 shadow-lg shadow-orange-500/30 transition-all transform active:scale-[0.98] text-center cursor-pointer whitespace-nowrap"
+                  className="w-full py-2.5 sm:py-3 px-4 bg-gradient-to-r from-[#ee4d2d] via-[#ff5722] to-[#ee4d2d] hover:brightness-105 text-white font-black text-sm rounded-xl flex items-center justify-center gap-2 shadow-md shadow-orange-500/25 transition-all transform active:scale-[0.98] text-center cursor-pointer whitespace-nowrap"
                 >
-                  <ShoppingBag className="w-5 h-5 flex-shrink-0" />
+                  <ShoppingBag className="w-4 h-4 flex-shrink-0" />
                   <span className="whitespace-nowrap truncate">{ad.buttonText || 'Aproveitar Oferta na Shopee'}</span>
-                  <ExternalLink className="w-4 h-4 flex-shrink-0 opacity-85" />
+                  <ExternalLink className="w-3.5 h-3.5 flex-shrink-0 opacity-85" />
                 </a>
 
                 {/* Disclaimer de Compra Segura */}
