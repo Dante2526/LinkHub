@@ -633,15 +633,15 @@ export const Editor: React.FC<EditorProps> = ({
                     </div>
                     {link.thumbnailUrl && (
                       <div className="pt-2 flex flex-col items-center">
-                        <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-2 px-1 text-center">Posição da Foto</label>
-                        <div className="flex justify-center gap-1 bg-gray-900/60 p-1 rounded-2xl w-full max-w-[280px]">
+                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2 px-1 text-center">Posição da Foto</label>
+                        <div className="flex justify-center gap-1.5 bg-gray-900/90 border border-gray-800 p-1.5 rounded-2xl w-full max-w-[280px]">
                           <button 
                             type="button"
                             onClick={() => updateLink(link.id, 'thumbnailPosition', 'left')}
                             className={`flex-1 py-1.5 px-3 text-xs rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 ${
                               (!link.thumbnailPosition || link.thumbnailPosition === 'left') 
-                                ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' 
-                                : 'text-gray-500 hover:text-white'
+                                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
+                                : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
                             }`}
                           >
                             <span>Esquerda</span>
@@ -651,8 +651,8 @@ export const Editor: React.FC<EditorProps> = ({
                             onClick={() => updateLink(link.id, 'thumbnailPosition', 'right')}
                             className={`flex-1 py-1.5 px-3 text-xs rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 ${
                               link.thumbnailPosition === 'right' 
-                                ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' 
-                                : 'text-gray-500 hover:text-white'
+                                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
+                                : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
                             }`}
                           >
                             <span>Direita</span>
@@ -660,15 +660,15 @@ export const Editor: React.FC<EditorProps> = ({
                         </div>
 
                         <div className="w-full pt-3">
-                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-2 px-1 text-center">Formato da Imagem</label>
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 bg-gray-900/60 p-1 rounded-2xl w-full max-w-[340px] mx-auto">
+                          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2 px-1 text-center">Formato da Imagem</label>
+                          <div className="flex bg-gray-900/90 border border-gray-800 p-1.5 rounded-2xl gap-1.5 w-full max-w-[380px] mx-auto">
                             <button 
                               type="button"
                               onClick={() => updateLink(link.id, 'thumbnailShape', 'round')}
-                              className={`py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${
+                              className={`flex-1 py-2 px-2 text-xs rounded-xl font-semibold whitespace-nowrap transition-all ${
                                 (!link.thumbnailShape ? (!data.theme.linkThumbnailShape || data.theme.linkThumbnailShape === 'round') : link.thumbnailShape === 'round')
-                                  ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' 
-                                  : 'text-gray-500 hover:text-white'
+                                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
+                                  : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
                               }`}
                             >
                               Círculo
@@ -676,10 +676,10 @@ export const Editor: React.FC<EditorProps> = ({
                             <button 
                               type="button"
                               onClick={() => updateLink(link.id, 'thumbnailShape', 'rounded')}
-                              className={`py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${
+                              className={`flex-1 py-2 px-2 text-xs rounded-xl font-semibold whitespace-nowrap transition-all ${
                                 link.thumbnailShape === 'rounded' 
-                                  ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' 
-                                  : 'text-gray-500 hover:text-white'
+                                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
+                                  : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
                               }`}
                             >
                               Arredondado
@@ -687,10 +687,10 @@ export const Editor: React.FC<EditorProps> = ({
                             <button 
                               type="button"
                               onClick={() => updateLink(link.id, 'thumbnailShape', 'square')}
-                              className={`py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${
+                              className={`flex-1 py-2 px-2 text-xs rounded-xl font-semibold whitespace-nowrap transition-all ${
                                 link.thumbnailShape === 'square' 
-                                  ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' 
-                                  : 'text-gray-500 hover:text-white'
+                                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
+                                  : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
                               }`}
                             >
                               Quadrado
@@ -698,10 +698,10 @@ export const Editor: React.FC<EditorProps> = ({
                             <button 
                               type="button"
                               onClick={() => updateLink(link.id, 'thumbnailShape', 'match-card')}
-                              className={`py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${
+                              className={`flex-1 py-2 px-2 text-xs rounded-xl font-semibold whitespace-nowrap transition-all ${
                                 (link.thumbnailShape === 'match-card' || (!link.thumbnailShape && data.theme.linkThumbnailShape === 'match-card'))
-                                  ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' 
-                                  : 'text-gray-500 hover:text-white'
+                                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
+                                  : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
                               }`}
                               title="Formato acompanha o formato do cartão de link"
                             >
@@ -712,27 +712,32 @@ export const Editor: React.FC<EditorProps> = ({
                       </div>
                     )}
                     <div className="pt-2 flex flex-col items-center">
-                      <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-2 px-1 text-center">Animação em Destaque</label>
-                      <div className="flex flex-wrap justify-center gap-1 bg-gray-900/60 p-1 rounded-2xl w-full">
+                      <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2 px-1 text-center">Animação em Destaque</label>
+                      <div className="flex flex-wrap justify-center gap-1.5 bg-gray-900/90 border border-gray-800 p-1.5 rounded-2xl w-full">
                         <button 
+                          type="button"
                           onClick={() => updateLink(link.id, 'animation', 'none')}
-                          className={`flex-1 min-w-[70px] py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${!link.animation || link.animation === 'none' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                          className={`flex-1 min-w-[70px] py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${!link.animation || link.animation === 'none' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                         >Nenhuma</button>
                         <button 
+                          type="button"
                           onClick={() => updateLink(link.id, 'animation', 'pulse')}
-                          className={`flex-1 min-w-[70px] py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${link.animation === 'pulse' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                          className={`flex-1 min-w-[70px] py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${link.animation === 'pulse' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                         >Pulsar</button>
                         <button 
+                          type="button"
                           onClick={() => updateLink(link.id, 'animation', 'bounce')}
-                          className={`flex-1 min-w-[70px] py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${link.animation === 'bounce' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                          className={`flex-1 min-w-[70px] py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${link.animation === 'bounce' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                         >Saltar</button>
                         <button 
+                          type="button"
                           onClick={() => updateLink(link.id, 'animation', 'shake')}
-                          className={`flex-1 min-w-[70px] py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${link.animation === 'shake' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                          className={`flex-1 min-w-[70px] py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${link.animation === 'shake' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                         >Tremer</button>
                         <button 
+                          type="button"
                           onClick={() => updateLink(link.id, 'animation', 'glow')}
-                          className={`flex-1 min-w-[70px] py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${link.animation === 'glow' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                          className={`flex-1 min-w-[70px] py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${link.animation === 'glow' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                         >Brilho</button>
                       </div>
                     </div>
@@ -891,18 +896,21 @@ export const Editor: React.FC<EditorProps> = ({
               
               <div className="space-y-3">
                 <label className="text-sm font-bold text-white block">Formato da Foto</label>
-                <div className="grid grid-cols-3 gap-2 bg-gray-900/60 p-1 rounded-2xl">
+                <div className="grid grid-cols-3 gap-2 bg-gray-900/90 border border-gray-800 p-1.5 rounded-2xl">
                   <button 
+                    type="button"
                     onClick={() => updateTheme('avatarShape', 'round')}
-                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.avatarShape === 'round' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.avatarShape === 'round' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                   >Redondo</button>
                   <button 
+                    type="button"
                     onClick={() => updateTheme('avatarShape', 'rounded')}
-                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.avatarShape === 'rounded' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.avatarShape === 'rounded' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                   >Quadrado<br/>(Bordas)</button>
                   <button 
+                    type="button"
                     onClick={() => updateTheme('avatarShape', 'square')}
-                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.avatarShape === 'square' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.avatarShape === 'square' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                   >Quadrado</button>
                 </div>
               </div>
@@ -1224,62 +1232,73 @@ export const Editor: React.FC<EditorProps> = ({
             <div className="bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-700/50 space-y-5 text-center">
               <h3 className="text-lg font-bold text-white mb-2">Cartões (Links)</h3>
               <div className="space-y-4">
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block text-center">Layout</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-gray-900/60 p-1 rounded-2xl">
+                <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block text-center">Layout</label>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 bg-gray-900/90 border border-gray-800 p-1.5 rounded-2xl">
                   <button 
+                    type="button"
                     onClick={() => updateTheme('linkFormat', 'classic')}
-                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.linkFormat === 'classic' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.linkFormat === 'classic' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                   >Clássico</button>
                   <button 
+                    type="button"
                     onClick={() => updateTheme('linkFormat', 'featured')}
-                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.linkFormat === 'featured' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.linkFormat === 'featured' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                   >Destaque</button>
                   <button 
+                    type="button"
                     onClick={() => updateTheme('linkFormat', 'compact')}
-                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.linkFormat === 'compact' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.linkFormat === 'compact' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                   >Compacto</button>
                   <button 
+                    type="button"
                     onClick={() => updateTheme('linkFormat', 'minimal')}
-                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.linkFormat === 'minimal' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.linkFormat === 'minimal' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                   >Minimalista</button>
                   <button 
+                    type="button"
                     onClick={() => updateTheme('linkFormat', 'banner')}
-                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.linkFormat === 'banner' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.linkFormat === 'banner' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                   >Banner</button>
                 </div>
 
                 <div className="pt-2 space-y-2">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block text-center">Posição da Foto nos Links</label>
-                  <div className="flex justify-center gap-1 bg-gray-900/60 p-1 rounded-2xl max-w-xs mx-auto">
+                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block text-center">Posição da Foto nos Links</label>
+                  <div className="flex justify-center gap-1.5 bg-gray-900/90 border border-gray-800 p-1.5 rounded-2xl max-w-xs mx-auto">
                     <button 
+                      type="button"
                       onClick={() => updateTheme('linkThumbnailPosition', 'left')}
-                      className={`flex-1 py-2 px-3 text-sm rounded-xl font-semibold transition-all ${(!data.theme.linkThumbnailPosition || data.theme.linkThumbnailPosition === 'left') ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                      className={`flex-1 py-2 px-3 text-sm rounded-xl font-semibold transition-all ${(!data.theme.linkThumbnailPosition || data.theme.linkThumbnailPosition === 'left') ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                     >Lado Esquerdo</button>
                     <button 
+                      type="button"
                       onClick={() => updateTheme('linkThumbnailPosition', 'right')}
-                      className={`flex-1 py-2 px-3 text-sm rounded-xl font-semibold transition-all ${data.theme.linkThumbnailPosition === 'right' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                      className={`flex-1 py-2 px-3 text-sm rounded-xl font-semibold transition-all ${data.theme.linkThumbnailPosition === 'right' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                     >Lado Direito</button>
                   </div>
                 </div>
 
                 <div className="pt-2 space-y-2">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block text-center">Formato da Imagem nos Links</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-gray-900/60 p-1 rounded-2xl">
+                  <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block text-center">Formato da Imagem nos Links</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-gray-900/90 border border-gray-800 p-1.5 rounded-2xl">
                     <button 
+                      type="button"
                       onClick={() => updateTheme('linkThumbnailShape', 'round')}
-                      className={`py-2 px-1 text-xs sm:text-sm rounded-xl font-semibold transition-all ${(!data.theme.linkThumbnailShape || data.theme.linkThumbnailShape === 'round') ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                      className={`py-2 px-1 text-xs sm:text-sm rounded-xl font-semibold transition-all ${(!data.theme.linkThumbnailShape || data.theme.linkThumbnailShape === 'round') ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                     >Círculo</button>
                     <button 
+                      type="button"
                       onClick={() => updateTheme('linkThumbnailShape', 'rounded')}
-                      className={`py-2 px-1 text-xs sm:text-sm rounded-xl font-semibold transition-all ${data.theme.linkThumbnailShape === 'rounded' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                      className={`py-2 px-1 text-xs sm:text-sm rounded-xl font-semibold transition-all ${data.theme.linkThumbnailShape === 'rounded' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                     >Arredondado</button>
                     <button 
+                      type="button"
                       onClick={() => updateTheme('linkThumbnailShape', 'square')}
-                      className={`py-2 px-1 text-xs sm:text-sm rounded-xl font-semibold transition-all ${data.theme.linkThumbnailShape === 'square' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                      className={`py-2 px-1 text-xs sm:text-sm rounded-xl font-semibold transition-all ${data.theme.linkThumbnailShape === 'square' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                     >Quadrado</button>
                     <button 
+                      type="button"
                       onClick={() => updateTheme('linkThumbnailShape', 'match-card')}
-                      className={`py-2 px-1 text-xs sm:text-sm rounded-xl font-semibold transition-all ${data.theme.linkThumbnailShape === 'match-card' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                      className={`py-2 px-1 text-xs sm:text-sm rounded-xl font-semibold transition-all ${data.theme.linkThumbnailShape === 'match-card' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                       title="Combina perfeitamente com o formato e bordas do cartão de link"
                     >Igual ao Cartão</button>
                   </div>
@@ -1291,18 +1310,21 @@ export const Editor: React.FC<EditorProps> = ({
               <h3 className="text-lg font-bold text-white mb-2">Estilo dos Botões</h3>
               
               <div className="space-y-4">
-                <div className="grid grid-cols-3 gap-2 bg-gray-900/60 p-1 rounded-2xl">
+                <div className="grid grid-cols-3 gap-2 bg-gray-900/90 border border-gray-800 p-1.5 rounded-2xl">
                   <button 
+                    type="button"
                     onClick={() => updateTheme('buttonStyle', 'solid')}
-                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.buttonStyle === 'solid' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.buttonStyle === 'solid' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                   >Sólido</button>
                   <button 
+                    type="button"
                     onClick={() => updateTheme('buttonStyle', 'outline')}
-                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.buttonStyle === 'outline' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.buttonStyle === 'outline' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                   >Contorno</button>
                   <button 
+                    type="button"
                     onClick={() => updateTheme('buttonStyle', 'glass')}
-                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.buttonStyle === 'glass' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                    className={`py-2 px-1 text-sm rounded-xl font-semibold transition-all ${data.theme.buttonStyle === 'glass' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
                   >Vidro</button>
                 </div>
 
