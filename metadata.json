@@ -1,6 +1,6 @@
 {
-  "name": "Link Organizer",
-  "description": "Um organizador de links customizável com suporte a temas, vídeos e imagens.",
+  "name": "Circuito0001",
+  "description": "Circuito0001 - Plataforma e organizador inteligente de links com temas dinâmicos e painel customizável.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

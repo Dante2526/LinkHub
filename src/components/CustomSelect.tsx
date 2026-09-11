@@ -15,6 +15,7 @@ interface CustomSelectProps {
   options: SelectOption[];
   className?: string;
   id?: string;
+  direction?: 'up' | 'down';
 }
 
 export const CustomSelect: React.FC<CustomSelectProps> = ({
@@ -23,6 +24,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
   options,
   className = '',
   id,
+  direction = 'down',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -52,7 +54,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="w-full flex items-center justify-between gap-3 bg-gray-100 hover:bg-gray-200/70 border border-gray-200/70 rounded-2xl px-4 py-3.5 text-sm text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all shadow-sm active:scale-[0.99]"
+        className="w-full flex items-center justify-between gap-3 bg-gray-900/60 hover:bg-gray-800 border border-gray-200/70 rounded-2xl px-4 py-3.5 text-sm text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all shadow-sm active:scale-[0.99]"
       >
         <div className="flex items-center gap-3 truncate text-left">
           {selectedOption?.preview && (
@@ -61,7 +63,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
             </div>
           )}
           <div className="truncate">
-            <span className="block truncate font-bold text-gray-900">
+            <span className="block truncate font-bold text-white">
               {selectedOption?.label || 'Selecione...'}
             </span>
             {selectedOption?.subtitle && (
@@ -74,7 +76,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
 
         <ChevronDown
           className={`w-4 h-4 text-gray-500 flex-shrink-0 transition-transform duration-200 ${
-            isOpen ? 'rotate-180 text-blue-600' : ''
+            isOpen ? 'rotate-180 text-blue-400' : ''
           }`}
         />
       </button>
@@ -83,11 +85,13 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            initial={{ opacity: 0, y: direction === 'up' ? 6 : -6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            exit={{ opacity: 0, y: direction === 'up' ? 6 : -6, scale: 0.98 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
-            className="absolute z-50 left-0 right-0 mt-2 bg-white rounded-2xl shadow-2xl border border-gray-100 p-1.5 max-h-72 overflow-y-auto space-y-1 backdrop-blur-md"
+            className={`absolute z-50 left-0 right-0 bg-gray-800 rounded-2xl shadow-2xl border border-gray-700/50 p-1.5 max-h-72 overflow-y-auto space-y-1 backdrop-blur-md ${
+              direction === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'
+            }`}
             style={{
               boxShadow: '0 20px 35px -10px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05)',
             }}
@@ -104,8 +108,8 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                   }}
                   className={`w-full flex items-center justify-between gap-3 px-3.5 py-3 rounded-xl text-left text-sm transition-colors ${
                     isSelected
-                      ? 'bg-blue-50 text-blue-700 font-bold'
-                      : 'text-gray-800 hover:bg-gray-100 font-medium'
+                      ? 'bg-blue-500/10 text-blue-300 font-bold'
+                      : 'text-gray-200 hover:bg-gray-900/60 font-medium'
                   }`}
                 >
                   <div className="flex items-center gap-3 truncate">
@@ -117,7 +121,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                     <div className="truncate">
                       <div className="truncate">{option.label}</div>
                       {option.subtitle && (
-                        <div className="text-xs text-gray-400 font-normal truncate">
+                        <div className="text-xs text-gray-500 font-normal truncate">
                           {option.subtitle}
                         </div>
                       )}

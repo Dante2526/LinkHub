@@ -540,6 +540,8 @@ export const Preview: React.FC<PreviewProps> = ({
             const format = theme.linkFormat || 'classic';
             const linkTextColor = link.textColor || theme.buttonTextColor || '#000000';
             const linkBgColor = link.buttonColor || theme.buttonColor || '#ffffff';
+            const thumbPos = link.thumbnailPosition || theme.linkThumbnailPosition || 'left';
+            const isRight = thumbPos === 'right';
 
             return (
               <motion.a 
@@ -575,7 +577,13 @@ export const Preview: React.FC<PreviewProps> = ({
                 ) : format === 'compact' ? (
                   <div className="relative w-full flex items-center justify-center min-h-[46px] py-2 px-3 text-center">
                     {link.thumbnailUrl && (
-                      <img src={link.thumbnailUrl} alt="" loading="lazy" decoding="async" className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full object-cover flex-shrink-0" />
+                      <img 
+                        src={link.thumbnailUrl} 
+                        alt="" 
+                        loading="lazy" 
+                        decoding="async" 
+                        className={`absolute ${isRight ? 'right-2.5' : 'left-2.5'} top-1/2 -translate-y-1/2 w-8 h-8 rounded-full object-cover flex-shrink-0`} 
+                      />
                     )}
                     <div className={`w-full ${link.thumbnailUrl ? 'px-9' : 'px-2'} flex flex-col items-center justify-center text-center`}>
                       <div className="font-medium text-sm leading-snug break-words">{link.title}</div>
@@ -606,12 +614,12 @@ export const Preview: React.FC<PreviewProps> = ({
                   // Formato Classic (Padrão) - Centralizado
                   <div className="relative w-full flex items-center justify-center min-h-[58px] py-3.5 px-4 text-center">
                     {link.thumbnailUrl && (
-                      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-full overflow-hidden flex-shrink-0">
+                      <div className={`absolute ${isRight ? 'right-3.5' : 'left-3.5'} top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-full overflow-hidden flex-shrink-0`}>
                         <img src={link.thumbnailUrl} alt="" className="w-full h-full object-cover" />
                       </div>
                     )}
                     
-                    <div className={`w-full ${link.thumbnailUrl ? 'px-12' : 'px-2'} flex flex-col items-center justify-center text-center`}>
+                    <div className={`w-full ${link.thumbnailUrl ? 'px-14' : 'px-2'} flex flex-col items-center justify-center text-center`}>
                       <div className="font-semibold text-base sm:text-lg leading-snug break-words">{link.title}</div>
                       {link.description && <div className="text-xs sm:text-sm opacity-80 mt-0.5 leading-snug break-words">{link.description}</div>}
                     </div>

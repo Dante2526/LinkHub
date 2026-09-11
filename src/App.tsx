@@ -78,14 +78,14 @@ function AdminView({
   };
 
   return (
-    <div className="flex h-screen w-full bg-[#f2f2f2] text-gray-900 overflow-hidden font-sans relative">
+    <div className="flex h-screen w-full bg-gray-950 text-white overflow-hidden font-sans relative">
       {/* Editor Panel (Left) */}
-      <div className={`w-full md:w-[450px] lg:w-[500px] h-full flex-shrink-0 flex-col z-10 bg-gray-50 border-r border-gray-200 ${showMobilePreview ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`w-full md:w-[450px] lg:w-[500px] h-full flex-shrink-0 flex-col z-10 bg-gray-900/40 border-r border-gray-700 ${showMobilePreview ? 'hidden md:flex' : 'flex'}`}>
         <div className="pt-12 md:pt-16 pb-6 px-6 md:px-8 flex items-center justify-between flex-shrink-0">
           <div className="flex flex-col">
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-black">LinkHub</h1>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">LinkHub</h1>
             {adminEmail && (
-              <span className="text-[11px] text-gray-400 font-medium truncate max-w-[170px] sm:max-w-[220px]" title={adminEmail}>
+              <span className="text-[11px] text-gray-500 font-medium truncate max-w-[170px] sm:max-w-[220px]" title={adminEmail}>
                 {adminEmail}
               </span>
             )}
@@ -93,11 +93,11 @@ function AdminView({
           <div className="flex items-center gap-2">
             <button 
               onClick={() => setShowMobilePreview(true)}
-              className="md:hidden flex items-center gap-1.5 px-3 py-2 bg-indigo-100 text-indigo-700 rounded-full text-xs font-semibold hover:bg-indigo-200 transition-colors"
+              className="md:hidden flex items-center gap-1.5 px-3 py-2 bg-indigo-900/30 text-indigo-300 rounded-full text-xs font-semibold hover:bg-indigo-200 transition-colors"
             >
               <Smartphone className="w-3.5 h-3.5" /> Ver
             </button>
-            <a href={window.location.hostname.includes('localhost') ? '/' : `https://${window.location.hostname.replace('-adm', '')}`} target="_blank" rel="noreferrer" className="hidden sm:flex items-center gap-1.5 px-3 py-2 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold hover:bg-blue-200 transition-colors">
+            <a href={window.location.hostname.includes('localhost') ? '/' : `https://${window.location.hostname.replace('-adm', '')}`} target="_blank" rel="noreferrer" className="hidden sm:flex items-center gap-1.5 px-3 py-2 bg-blue-900/30 text-blue-300 rounded-full text-xs font-semibold hover:bg-blue-200 transition-colors">
               Público <ExternalLink className="w-3.5 h-3.5" />
             </a>
             {onLogout && (
@@ -105,7 +105,7 @@ function AdminView({
                 type="button"
                 onClick={onLogout}
                 title="Sair do painel administrativo"
-                className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-red-50 text-gray-700 hover:text-red-600 rounded-full text-xs font-semibold transition-all border border-gray-200 hover:border-red-200 cursor-pointer shadow-xs"
+                className="flex items-center gap-1.5 px-3 py-2 bg-gray-800 hover:bg-red-500/10 text-gray-600 hover:text-red-400 rounded-full text-xs font-semibold transition-all border border-gray-700 hover:border-red-500/20 cursor-pointer shadow-xs"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Sair</span>
@@ -115,9 +115,9 @@ function AdminView({
         </div>
         <div className="flex-1 overflow-hidden">
           <Suspense fallback={
-            <div className="flex h-full w-full items-center justify-center bg-gray-50">
+            <div className="flex h-full w-full items-center justify-center bg-gray-900/40">
               <div className="flex flex-col items-center gap-3">
-                <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+                <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
                 <span className="text-xs text-gray-500 font-medium">Carregando painel do editor...</span>
               </div>
             </div>
@@ -134,17 +134,17 @@ function AdminView({
       </div>
 
       {/* Preview Panel (Right / Mobile Full) */}
-      <div className={`${showMobilePreview ? 'flex' : 'hidden md:flex'} flex-1 flex-col relative z-10 bg-[#e3e3e3]`}>
+      <div className={`${showMobilePreview ? 'flex' : 'hidden md:flex'} flex-1 flex-col relative z-10 bg-black`}>
         {/* Mobile Header (Only visible when mobile preview is active) */}
         {showMobilePreview && (
-          <div className="md:hidden h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 flex-shrink-0">
+          <div className="md:hidden h-16 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-4 flex-shrink-0">
             <button 
               onClick={() => setShowMobilePreview(false)}
-              className="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
+              className="px-4 py-2 text-sm font-semibold text-gray-600 bg-gray-900/60 rounded-full hover:bg-gray-700 transition-colors"
             >
               Voltar ao Editor
             </button>
-            <a href={window.location.hostname.includes('localhost') ? '/' : `https://${window.location.hostname.replace('-adm', '')}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold hover:bg-blue-200 transition-colors">
+            <a href={window.location.hostname.includes('localhost') ? '/' : `https://${window.location.hostname.replace('-adm', '')}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-4 py-2 bg-blue-900/30 text-blue-300 rounded-full text-sm font-semibold hover:bg-blue-200 transition-colors">
               Público <ExternalLink className="w-4 h-4" />
             </a>
           </div>
@@ -152,17 +152,17 @@ function AdminView({
 
         {/* Top bar for view toggle (Desktop only) */}
         <div className="hidden md:flex h-20 items-center justify-center gap-2 flex-shrink-0 pt-4">
-          <div className="flex bg-white rounded-full p-1 shadow-sm border border-gray-200">
+          <div className="flex bg-gray-800 rounded-full p-1 shadow-sm border border-gray-700">
             <button 
               onClick={() => setPreviewMode('mobile')}
-              className={`px-6 py-2 rounded-full flex items-center gap-2 text-sm font-semibold transition-all ${previewMode === 'mobile' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:text-gray-900'}`}
+              className={`px-6 py-2 rounded-full flex items-center gap-2 text-sm font-semibold transition-all ${previewMode === 'mobile' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:text-white'}`}
               title="Visualização Mobile"
             >
               <Smartphone className="w-4 h-4" /> Mobile
             </button>
             <button 
               onClick={() => setPreviewMode('desktop')}
-              className={`px-6 py-2 rounded-full flex items-center gap-2 text-sm font-semibold transition-all ${previewMode === 'desktop' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:text-gray-900'}`}
+              className={`px-6 py-2 rounded-full flex items-center gap-2 text-sm font-semibold transition-all ${previewMode === 'desktop' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:text-white'}`}
               title="Visualização Desktop"
             >
               <Monitor className="w-4 h-4" /> Desktop
@@ -177,7 +177,7 @@ function AdminView({
               relative overflow-hidden transition-all duration-500 ease-in-out shadow-2xl shrink-0
               ${previewMode === 'mobile' 
                 ? 'h-full max-h-[720px] aspect-[9/19] rounded-[2.5rem] border-[12px] border-black bg-black' 
-                : 'w-full h-full max-w-5xl rounded-3xl border border-gray-300 bg-white'
+                : 'w-full h-full max-w-5xl rounded-3xl border border-gray-600 bg-gray-800'
               }
             `}
           >
@@ -224,6 +224,7 @@ export default function App() {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    document.title = 'Circuito0001';
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
@@ -396,7 +397,7 @@ export default function App() {
       <div className="flex h-screen w-full items-center justify-center bg-gray-900 text-white">
         <div className="flex flex-col items-center gap-4 animate-pulse">
           <div className="w-10 h-10 rounded-full border-3 border-blue-500 border-t-transparent animate-spin"></div>
-          <p className="text-gray-400 text-sm font-medium tracking-wide">Carregando perfil...</p>
+          <p className="text-gray-500 text-sm font-medium tracking-wide">Carregando perfil...</p>
         </div>
       </div>
     );

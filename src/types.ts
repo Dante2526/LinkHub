@@ -28,6 +28,7 @@ export interface Theme {
   avatarShape: AvatarShape;
   profileTextColor?: string;
   linkTextAlign?: 'center' | 'left';
+  linkThumbnailPosition?: 'left' | 'right';
 }
 
 export interface LinkItem {
@@ -36,6 +37,7 @@ export interface LinkItem {
   description?: string;
   url: string;
   thumbnailUrl: string;
+  thumbnailPosition?: 'left' | 'right';
   isVisible: boolean;
   animation?: LinkAnimation;
   textColor?: string;
@@ -102,6 +104,7 @@ export const defaultTheme: Theme = {
   avatarShape: 'round',
   profileTextColor: '#ffffff',
   linkTextAlign: 'center',
+  linkThumbnailPosition: 'left',
 };
 
 export const defaultProfile: Profile = {
