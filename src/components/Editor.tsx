@@ -4,7 +4,7 @@ import { GripVertical, Plus, Trash2, Image as ImageIcon, Video, Palette, Link as
 import { ColorPicker } from './ColorPicker';
 import { CustomSelect, SelectOption } from './CustomSelect';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { collection, getCountFromServer, getDocs, query, orderBy, limit, setDoc, doc } from 'firebase/firestore';
+import { collection, getCountFromServer, getDocs, query, orderBy, limit, setDoc, doc, where } from 'firebase/firestore';
 import { db, storage, isFirebaseConfigured } from '../lib/firebase';
 
 const BACKGROUND_TYPE_OPTIONS: SelectOption[] = [
@@ -106,7 +106,15 @@ export const Editor: React.FC<EditorProps> = ({
   const [activeTab, setActiveTab] = useState<'profile' | 'links' | 'theme' | 'ad' | 'stats'>('links');
   const [uploadingState, setUploadingState] = useState<Record<string, boolean>>({});
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
-  const [metrics, setMetrics] = useState({ views: 0, clicks: 0, clicksByLink: {} as Record<string, number>, bestDay: '--', bestHour: '--' });
+  const [metrics, setMetrics] = useState({ 
+    views: 0, 
+    clicks: 0, 
+    adClicks: 0,
+    adConversionRate: 0,
+    clicksByLink: {} as Record<string, number>, 
+    bestDay: '--', 
+    bestHour: '--' 
+  });
   const [loadingMetrics, setLoadingMetrics] = useState(false);
 
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
@@ -220,6 +228,8 @@ export const Editor: React.FC<EditorProps> = ({
           setMetrics({
             views: 0,
             clicks: 0,
+            adClicks: 0,
+            adConversionRate: 0,
             clicksByLink: {},
             bestHour: '--',
             bestDay: '--'
@@ -230,6 +240,14 @@ export const Editor: React.FC<EditorProps> = ({
         try {
           const viewsSnap = await getCountFromServer(collection(db, 'visualizacoes'));
           const clicksSnap = await getCountFromServer(collection(db, 'cliques'));
+
+          let adClicks = 0;
+          try {
+            const adClicksSnap = await getCountFromServer(query(collection(db, 'cliques'), where('linkId', '==', '__advertisement__')));
+            adClicks = adClicksSnap.data().count;
+          } catch (e) {
+            console.warn("Could not fetch ad clicks count with where query", e);
+          }
           
           const clicksQuery = await getDocs(query(collection(db, 'cliques'), orderBy('time', 'desc'), limit(500)));
           const clicksByLink: Record<string, number> = {};
@@ -247,6 +265,14 @@ export const Editor: React.FC<EditorProps> = ({
                dayCounts[dayStr] = (dayCounts[dayStr] || 0) + 1;
             }
           });
+
+          // Se a query count do ad falhou ou retornou 0 mas há registros locais na query recente:
+          if (adClicks === 0 && clicksByLink['__advertisement__']) {
+            adClicks = clicksByLink['__advertisement__'];
+          }
+
+          const viewsCount = viewsSnap.data().count;
+          const adConversionRate = viewsCount > 0 ? Number(((adClicks / viewsCount) * 100).toFixed(1)) : 0;
           
           const maxHourCount = Math.max(0, ...hourCounts);
           const bestHour = maxHourCount > 0 ? hourCounts.indexOf(maxHourCount) : null;
@@ -257,8 +283,10 @@ export const Editor: React.FC<EditorProps> = ({
           const bestDayFormatted = bestDay !== '--' ? bestDay.charAt(0).toUpperCase() + bestDay.slice(1) : '--';
           
           setMetrics({
-            views: viewsSnap.data().count,
+            views: viewsCount,
             clicks: clicksSnap.data().count,
+            adClicks,
+            adConversionRate,
             clicksByLink,
             bestHour: bestHourStr,
             bestDay: bestDayFormatted
