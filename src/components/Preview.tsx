@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AppData, Theme, BackgroundPosition, ThumbnailShape, ButtonRadius } from '../types';
+import { AppData, Theme, BackgroundPosition, ThumbnailShape, ButtonRadius, LinkItem } from '../types';
 import { Share2, X, ShoppingBag, ExternalLink, Clock, ShieldCheck, Sparkles, Move, Check, RotateCcw, Truck, Flame, Tag } from 'lucide-react';
 import { db, isFirebaseConfigured } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -39,8 +39,8 @@ const getBackgroundStyle = (theme: Theme, position: BackgroundPosition = { x: 50
       };
     case 'video':
       return { 
-        backgroundColor: theme.backgroundColor || '#0f172a',
-        background: theme.backgroundGradient || theme.backgroundColor || '#0f172a'
+        backgroundColor: '#0a0a0a',
+        background: '#0a0a0a'
       };
     default:
       return { backgroundColor: theme.backgroundColor || '#f2f2f2' };
@@ -175,6 +175,217 @@ const getButtonStyle = (theme: Theme): string => {
   const shadowClass = theme.buttonShadow ? "shadow-lg" : "";
 
   return `${base} ${radiusClass} ${styleClass} ${shadowClass}`;
+};
+
+interface EllipseRipple {
+  id: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fill: string;
+  ring: string;
+}
+
+const getRippleColors = (bgColor?: string, textColor?: string) => {
+  if (bgColor && bgColor.startsWith('#') && (bgColor.length === 7 || bgColor.length === 4)) {
+    const hex = bgColor.length === 4 
+      ? `#${bgColor[1]}${bgColor[1]}${bgColor[2]}${bgColor[2]}${bgColor[3]}${bgColor[3]}` 
+      : bgColor;
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    if (lum > 0.65) {
+      return {
+        fill: 'rgba(0, 0, 0, 0.2)',
+        ring: 'rgba(0, 0, 0, 0.35)',
+      };
+    }
+  }
+  return {
+    fill: 'rgba(255, 255, 255, 0.45)',
+    ring: 'rgba(255, 255, 255, 0.75)',
+  };
+};
+
+interface LinkItemCardProps {
+  link: LinkItem;
+  theme: Theme;
+  onLinkClick?: (id: string) => void;
+}
+
+const LinkItemCard: React.FC<LinkItemCardProps> = ({ link, theme, onLinkClick }) => {
+  const [ripples, setRipples] = useState<EllipseRipple[]>([]);
+  const format = theme.linkFormat || 'classic';
+  const linkTextColor = link.textColor || theme.buttonTextColor || '#000000';
+  const linkBgColor = link.buttonColor || theme.buttonColor || '#ffffff';
+  const thumbPos = link.thumbnailPosition || theme.linkThumbnailPosition || 'left';
+  const isRight = thumbPos === 'right';
+  const thumbShape = link.thumbnailShape || theme.linkThumbnailShape || 'round';
+  const thumbShapeClass = getThumbnailShapeClass(thumbShape, theme.buttonRadius);
+  const normalizedUrl = link.url?.trim() 
+    ? (/^(https?:\/\/|mailto:|tel:)/i.test(link.url.trim()) ? link.url.trim() : `https://${link.url.trim()}`) 
+    : '#';
+
+  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clientX = e.clientX || (rect.left + rect.width / 2);
+    const clientY = e.clientY || (rect.top + rect.height / 2);
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+
+    // Distância máxima para preencher todo o botão partindo das coordenadas do clique
+    const distX = Math.max(x, rect.width - x);
+    const distY = Math.max(y, rect.height - y);
+    const maxRadius = Math.hypot(distX, distY);
+
+    // Geometria em elipse: mais larga horizontalmente do que verticalmente para acompanhar a silhueta do botão
+    const width = Math.max(maxRadius * 2.6, rect.width * 1.5);
+    const height = Math.max(maxRadius * 1.6, rect.height * 2.2);
+
+    const colors = getRippleColors(
+      theme.buttonStyle === 'solid' ? linkBgColor : undefined,
+      linkTextColor
+    );
+
+    const id = Date.now() + Math.random();
+    setRipples(prev => [...prev.slice(-3), {
+      id,
+      x,
+      y,
+      width,
+      height,
+      fill: colors.fill,
+      ring: colors.ring,
+    }]);
+
+    setTimeout(() => {
+      setRipples(prev => prev.filter(r => r.id !== id));
+    }, 800);
+
+    onLinkClick?.(link.id);
+  };
+
+  return (
+    <motion.a 
+      onClick={handleClick}
+      variants={getAnimationVariants(link.animation)}
+      whileHover={{ scale: 1.02, y: -2 }}
+      whileTap={{ scale: 0.98 }}
+      href={normalizedUrl} 
+      target="_blank" 
+      rel="noopener noreferrer"
+      className={`${getButtonStyle(theme)} overflow-hidden transition-all relative select-none`}
+      style={
+        theme.buttonStyle === 'solid' 
+          ? { backgroundColor: linkBgColor, color: linkTextColor }
+          : theme.buttonStyle === 'outline'
+            ? { borderColor: linkBgColor, color: linkTextColor }
+            : { color: linkTextColor }
+      }
+    >
+      {/* GPU-Accelerated Expanding Ellipse Wavefront from Click Point */}
+      <AnimatePresence>
+        {ripples.map(ripple => (
+          <motion.span
+            key={ripple.id}
+            initial={{
+              scale: 0.05,
+              opacity: 0.85,
+            }}
+            animate={{
+              scale: 1,
+              opacity: 0,
+            }}
+            exit={{ opacity: 0 }}
+            transition={{
+              duration: 0.55,
+              ease: [0.16, 1, 0.3, 1],
+            }}
+            onAnimationComplete={() => {
+              setRipples(prev => prev.filter(r => r.id !== ripple.id));
+            }}
+            className="absolute pointer-events-none -translate-x-1/2 -translate-y-1/2 z-30 will-change-transform"
+            style={{
+              left: ripple.x,
+              top: ripple.y,
+              width: ripple.width,
+              height: ripple.height,
+              borderRadius: '50%',
+              background: `radial-gradient(ellipse at center, ${ripple.fill} 0%, ${ripple.fill} 40%, transparent 75%)`,
+              border: `1.5px solid ${ripple.ring}`,
+              transformOrigin: 'center center',
+            }}
+          />
+        ))}
+      </AnimatePresence>
+
+      {format === 'featured' ? (
+        <div className="flex flex-col w-full">
+          {link.thumbnailUrl && (
+            <div className="w-full h-40 bg-black/5 flex-shrink-0">
+              <img src={link.thumbnailUrl} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+            </div>
+          )}
+          <div className="p-4 w-full text-center">
+            <div className="font-semibold text-lg leading-snug">{link.title}</div>
+            {link.description && <div className="text-sm opacity-80 mt-1 leading-snug">{link.description}</div>}
+          </div>
+        </div>
+      ) : format === 'compact' ? (
+        <div className="relative w-full flex items-center justify-center min-h-[46px] py-2 px-3 text-center">
+          {link.thumbnailUrl && (
+            <img 
+              src={link.thumbnailUrl} 
+              alt="" 
+              loading="lazy" 
+              decoding="async" 
+              className={`absolute ${isRight ? 'right-2.5' : 'left-2.5'} top-1/2 -translate-y-1/2 w-8 h-8 ${thumbShapeClass} object-cover flex-shrink-0`} 
+            />
+          )}
+          <div className={`w-full ${link.thumbnailUrl ? 'px-9' : 'px-2'} flex flex-col items-center justify-center text-center`}>
+            <div className="font-medium text-sm leading-snug break-words">{link.title}</div>
+            {link.description && <div className="text-xs opacity-80 mt-0.5 leading-snug break-words">{link.description}</div>}
+          </div>
+        </div>
+      ) : format === 'minimal' ? (
+        <div className="w-full p-4 text-center">
+          <div className="font-semibold text-lg leading-snug">{link.title}</div>
+          {link.description && <div className="text-xs opacity-80 mt-1 leading-snug">{link.description}</div>}
+        </div>
+      ) : format === 'banner' ? (
+        <div className="w-full relative h-32 flex flex-col justify-end overflow-hidden group-hover:scale-[1.01] transition-transform">
+          {link.thumbnailUrl ? (
+            <>
+               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent z-10" />
+               <img src={link.thumbnailUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover z-0" />
+            </>
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/10 z-10" />
+          )}
+          <div className="relative z-20 p-4 w-full text-center text-white">
+            <div className="font-bold text-xl drop-shadow-md">{link.title}</div>
+            {link.description && <div className="text-sm opacity-90 mt-0.5 drop-shadow-md">{link.description}</div>}
+          </div>
+        </div>
+      ) : (
+        // Formato Classic (Padrão) - Centralizado
+        <div className="relative w-full flex items-center justify-center min-h-[58px] py-3.5 px-4 text-center">
+          {link.thumbnailUrl && (
+            <div className={`absolute ${isRight ? 'right-3.5' : 'left-3.5'} top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center ${thumbShapeClass} overflow-hidden flex-shrink-0`}>
+              <img src={link.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+            </div>
+          )}
+          
+          <div className={`w-full ${link.thumbnailUrl ? 'px-14' : 'px-2'} flex flex-col items-center justify-center text-center`}>
+            <div className="font-semibold text-base sm:text-lg leading-snug break-words">{link.title}</div>
+            {link.description && <div className="text-xs sm:text-sm opacity-80 mt-0.5 leading-snug break-words">{link.description}</div>}
+          </div>
+        </div>
+      )}
+    </motion.a>
+  );
 };
 
 export const Preview: React.FC<PreviewProps> = ({ 
@@ -320,15 +531,38 @@ export const Preview: React.FC<PreviewProps> = ({
     return () => clearTimeout(timer);
   }, [isAdOpen, adCountdown]);
 
+  const [adRipples, setAdRipples] = useState<EllipseRipple[]>([]);
+
   const handleCloseAd = () => {
     if (adCountdown > 0) return;
     localStorage.setItem('linkhub_last_ad_seen', Date.now().toString());
     setIsAdOpen(false);
   };
 
-  const handleAdCtaClick = () => {
+  const handleAdCtaClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clientX = e.clientX || (rect.left + rect.width / 2);
+    const clientY = e.clientY || (rect.top + rect.height / 2);
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const maxRadius = Math.hypot(Math.max(x, rect.width - x), Math.max(y, rect.height - y));
+    const id = Date.now() + Math.random();
+    setAdRipples(prev => [...prev.slice(-2), {
+      id,
+      x,
+      y,
+      width: maxRadius * 2.6,
+      height: maxRadius * 1.6,
+      fill: 'rgba(255, 255, 255, 0.45)',
+      ring: 'rgba(255, 255, 255, 0.75)',
+    }]);
+    setTimeout(() => {
+      setAdRipples(prev => prev.filter(r => r.id !== id));
+    }, 800);
     localStorage.setItem('linkhub_last_ad_seen', Date.now().toString());
-    setIsAdOpen(false);
+    setTimeout(() => {
+      setIsAdOpen(false);
+    }, 250);
   };
 
   useEffect(() => {
@@ -561,103 +795,14 @@ export const Preview: React.FC<PreviewProps> = ({
             }
           }}
         >
-          {links.filter(l => l.isVisible).map(link => {
-            const format = theme.linkFormat || 'classic';
-            const linkTextColor = link.textColor || theme.buttonTextColor || '#000000';
-            const linkBgColor = link.buttonColor || theme.buttonColor || '#ffffff';
-            const thumbPos = link.thumbnailPosition || theme.linkThumbnailPosition || 'left';
-            const isRight = thumbPos === 'right';
-            const thumbShape = link.thumbnailShape || theme.linkThumbnailShape || 'round';
-            const thumbShapeClass = getThumbnailShapeClass(thumbShape, theme.buttonRadius);
-            const normalizedUrl = link.url?.trim() 
-              ? (/^(https?:\/\/|mailto:|tel:)/i.test(link.url.trim()) ? link.url.trim() : `https://${link.url.trim()}`) 
-              : '#';
-
-            return (
-              <motion.a 
-                onClick={() => onLinkClick?.(link.id)}
-                variants={getAnimationVariants(link.animation)}
-                whileHover={{ scale: 1.02, y: -2 }}
-                whileTap={{ scale: 0.98 }}
-                key={link.id} 
-                href={normalizedUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className={`${getButtonStyle(theme)} overflow-hidden transition-all`}
-                style={
-                  theme.buttonStyle === 'solid' 
-                    ? { backgroundColor: linkBgColor, color: linkTextColor }
-                    : theme.buttonStyle === 'outline'
-                      ? { borderColor: linkBgColor, color: linkTextColor }
-                      : { color: linkTextColor }
-                }
-              >
-                {format === 'featured' ? (
-                  <div className="flex flex-col w-full">
-                    {link.thumbnailUrl && (
-                      <div className="w-full h-40 bg-black/5 flex-shrink-0">
-                        <img src={link.thumbnailUrl} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                      </div>
-                    )}
-                    <div className="p-4 w-full text-center">
-                      <div className="font-semibold text-lg leading-snug">{link.title}</div>
-                      {link.description && <div className="text-sm opacity-80 mt-1 leading-snug">{link.description}</div>}
-                    </div>
-                  </div>
-                ) : format === 'compact' ? (
-                  <div className="relative w-full flex items-center justify-center min-h-[46px] py-2 px-3 text-center">
-                    {link.thumbnailUrl && (
-                      <img 
-                        src={link.thumbnailUrl} 
-                        alt="" 
-                        loading="lazy" 
-                        decoding="async" 
-                        className={`absolute ${isRight ? 'right-2.5' : 'left-2.5'} top-1/2 -translate-y-1/2 w-8 h-8 ${thumbShapeClass} object-cover flex-shrink-0`} 
-                      />
-                    )}
-                    <div className={`w-full ${link.thumbnailUrl ? 'px-9' : 'px-2'} flex flex-col items-center justify-center text-center`}>
-                      <div className="font-medium text-sm leading-snug break-words">{link.title}</div>
-                      {link.description && <div className="text-xs opacity-80 mt-0.5 leading-snug break-words">{link.description}</div>}
-                    </div>
-                  </div>
-                ) : format === 'minimal' ? (
-                  <div className="w-full p-4 text-center">
-                    <div className="font-semibold text-lg leading-snug">{link.title}</div>
-                    {link.description && <div className="text-xs opacity-80 mt-1 leading-snug">{link.description}</div>}
-                  </div>
-                ) : format === 'banner' ? (
-                  <div className="w-full relative h-32 flex flex-col justify-end overflow-hidden group-hover:scale-[1.01] transition-transform">
-                    {link.thumbnailUrl ? (
-                      <>
-                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent z-10" />
-                         <img src={link.thumbnailUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover z-0" />
-                      </>
-                    ) : (
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/10 z-10" />
-                    )}
-                    <div className="relative z-20 p-4 w-full text-center text-white">
-                      <div className="font-bold text-xl drop-shadow-md">{link.title}</div>
-                      {link.description && <div className="text-sm opacity-90 mt-0.5 drop-shadow-md">{link.description}</div>}
-                    </div>
-                  </div>
-                ) : (
-                  // Formato Classic (Padrão) - Centralizado
-                  <div className="relative w-full flex items-center justify-center min-h-[58px] py-3.5 px-4 text-center">
-                    {link.thumbnailUrl && (
-                      <div className={`absolute ${isRight ? 'right-3.5' : 'left-3.5'} top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center ${thumbShapeClass} overflow-hidden flex-shrink-0`}>
-                        <img src={link.thumbnailUrl} alt="" className="w-full h-full object-cover" />
-                      </div>
-                    )}
-                    
-                    <div className={`w-full ${link.thumbnailUrl ? 'px-14' : 'px-2'} flex flex-col items-center justify-center text-center`}>
-                      <div className="font-semibold text-base sm:text-lg leading-snug break-words">{link.title}</div>
-                      {link.description && <div className="text-xs sm:text-sm opacity-80 mt-0.5 leading-snug break-words">{link.description}</div>}
-                    </div>
-                  </div>
-                )}
-              </motion.a>
-            );
-          })}
+          {links.filter(l => l.isVisible).map(link => (
+            <LinkItemCard 
+              key={link.id} 
+              link={link} 
+              theme={theme} 
+              onLinkClick={onLinkClick} 
+            />
+          ))}
         </motion.div>
         </div>
       </div>
@@ -720,15 +865,15 @@ export const Preview: React.FC<PreviewProps> = ({
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
               transition={{ type: "spring", stiffness: 350, damping: 25 }}
-              className="bg-white rounded-[24px] sm:rounded-[28px] overflow-hidden w-full max-w-[340px] sm:max-w-sm shadow-2xl relative border border-gray-100 flex flex-col"
+              className="bg-white rounded-[24px] sm:rounded-[28px] overflow-hidden w-full max-w-[340px] sm:max-w-[360px] shadow-2xl relative border border-gray-100 flex flex-col my-auto max-h-[94%]"
               style={{ color: '#000', fontFamily: 'system-ui, -apple-system, sans-serif' }}
             >
               {/* Top Bar with Badge and Countdown / Close Button */}
-              <div className="flex items-center justify-between px-3.5 py-2.5 bg-gradient-to-r from-orange-50/80 via-white to-orange-50/80 border-b border-orange-100/80 flex-shrink-0">
+              <div className="flex items-center justify-between px-3.5 py-2.5 bg-gradient-to-r from-orange-50/80 via-white to-orange-50/80 border-b border-orange-100/80 flex-shrink-0 gap-2">
                 {/* Badge à esquerda com respiro */}
-                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[#ee4d2d] text-white text-[10px] sm:text-[11px] font-black rounded-full shadow-xs uppercase tracking-wider whitespace-nowrap flex-shrink-0">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[#ee4d2d] text-white text-[10px] sm:text-[11px] font-black rounded-full shadow-xs uppercase tracking-wider min-w-0 max-w-[calc(100%-38px)]">
                   <Sparkles className="w-3 h-3 text-yellow-300 animate-pulse flex-shrink-0" />
-                  <span className="whitespace-nowrap">{ad.badgeText || 'Oferta Relâmpago'}</span>
+                  <span className="truncate">{ad.badgeText || 'Oferta Relâmpago'}</span>
                 </div>
 
                 {/* Contador circular ou botão de fechar */}
@@ -760,58 +905,58 @@ export const Preview: React.FC<PreviewProps> = ({
                     alt={ad.title} 
                     loading="eager"
                     decoding="async"
-                    className="w-full max-h-[160px] sm:max-h-[190px] object-contain rounded-xl drop-shadow-sm transition-transform duration-300 hover:scale-[1.02]"
+                    className="w-full max-h-[140px] sm:max-h-[175px] object-contain rounded-xl drop-shadow-sm transition-transform duration-300 hover:scale-[1.02]"
                     referrerPolicy="no-referrer"
                   />
                 </div>
               )}
 
               {/* Body Content */}
-              <div className="p-3 sm:p-4 flex flex-col gap-2 flex-1">
+              <div className="p-3 sm:p-3.5 flex flex-col gap-2.5 flex-1 overflow-y-auto min-h-0">
                 {/* Bloco de Preço & Economia */}
                 {(ad.price || ad.originalPrice) && (
-                  <div className="bg-gradient-to-r from-orange-50 via-amber-50/50 to-orange-50 px-3 py-2 rounded-xl border border-orange-200/80 shadow-xs flex flex-col gap-1">
-                    {/* Linha 1: Tag de Oferta e Selo Frete Grátis com espaço de sobra */}
-                    <div className="flex items-center justify-between">
-                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-[#ee4d2d] uppercase tracking-wider whitespace-nowrap">
+                  <div className="bg-gradient-to-r from-orange-50 via-amber-50/50 to-orange-50 px-3 py-2 rounded-xl border border-orange-200/80 shadow-xs flex flex-col gap-1 overflow-hidden">
+                    {/* Linha 1: Tag de Oferta e Selo Frete Grátis com flex-wrap para nunca vazar */}
+                    <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-[#ee4d2d] uppercase tracking-wider">
                         <Tag className="w-3 h-3 text-[#ee4d2d] flex-shrink-0" />
                         <span>Preço Especial</span>
                       </span>
 
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-lg whitespace-nowrap shadow-2xs">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[9px] sm:text-[10px] font-bold rounded-md shadow-2xs">
                         <Truck className="w-3 h-3 text-emerald-600 flex-shrink-0" />
                         <span>Frete Grátis</span>
                       </span>
                     </div>
 
                     {/* Linha 2: Valores do Preço com largura total e destaque */}
-                    <div className="flex items-baseline gap-2">
+                    <div className="flex items-baseline gap-2 flex-wrap">
                       {ad.price && (
-                        <span className="text-xl sm:text-2xl font-black text-[#ee4d2d] tracking-tight whitespace-nowrap">
+                        <span className="text-xl sm:text-2xl font-black text-[#ee4d2d] tracking-tight">
                           {ad.price}
                         </span>
                       )}
                       {ad.originalPrice && (
-                        <span className="text-xs text-gray-400 font-semibold line-through whitespace-nowrap">
+                        <span className="text-xs text-gray-400 font-semibold line-through">
                           {ad.originalPrice}
                         </span>
                       )}
                     </div>
 
                     {/* Linha 3: Prova social e volume de vendas */}
-                    <div className="flex items-center gap-1 text-[10px] text-gray-500 pt-1 border-t border-orange-200/50 font-medium">
+                    <div className="flex items-center gap-1 text-[10px] text-gray-500 pt-1 border-t border-orange-200/50 font-medium flex-wrap">
                       <span className="text-amber-500 font-bold">★ 4.9</span>
-                      <span className="text-gray-500 whitespace-nowrap">• Mais de 1.000 vendidos</span>
+                      <span className="text-gray-500">• Mais de 1.000 vendidos</span>
                     </div>
                   </div>
                 )}
 
-                <div>
-                  <h3 className="text-sm sm:text-base font-bold text-gray-900 leading-snug line-clamp-1">
+                <div className="space-y-0.5">
+                  <h3 className="text-sm sm:text-base font-bold text-gray-900 leading-snug break-words">
                     {ad.title}
                   </h3>
                   {ad.description && (
-                    <p className="text-[11px] sm:text-xs text-gray-600 mt-0.5 leading-snug line-clamp-2">
+                    <p className="text-[11px] sm:text-xs text-gray-600 leading-snug break-words">
                       {ad.description}
                     </p>
                   )}
@@ -819,13 +964,13 @@ export const Preview: React.FC<PreviewProps> = ({
 
                 {/* Selos de Confiança (Sem quebra de linha) */}
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-gray-50 border border-gray-100 text-[10px] sm:text-[11px] font-semibold text-gray-700 whitespace-nowrap">
+                  <div className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-gray-50 border border-gray-100 text-[10px] sm:text-[11px] font-semibold text-gray-700 min-w-0">
                     <span className="text-emerald-500 font-bold text-xs flex-shrink-0">✓</span>
-                    <span className="whitespace-nowrap">Em Estoque</span>
+                    <span className="truncate">Em Estoque</span>
                   </div>
-                  <div className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-gray-50 border border-gray-100 text-[10px] sm:text-[11px] font-semibold text-gray-700 whitespace-nowrap">
+                  <div className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-gray-50 border border-gray-100 text-[10px] sm:text-[11px] font-semibold text-gray-700 min-w-0">
                     <span className="text-orange-500 font-bold text-xs flex-shrink-0">⚡</span>
-                    <span className="whitespace-nowrap">Envio Imediato</span>
+                    <span className="truncate">Envio Imediato</span>
                   </div>
                 </div>
 
@@ -835,17 +980,51 @@ export const Preview: React.FC<PreviewProps> = ({
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={handleAdCtaClick}
-                  className="w-full py-2.5 sm:py-3 px-4 bg-gradient-to-r from-[#ee4d2d] via-[#ff5722] to-[#ee4d2d] hover:brightness-105 text-white font-black text-sm rounded-xl flex items-center justify-center gap-2 shadow-md shadow-orange-500/25 transition-all transform active:scale-[0.98] text-center cursor-pointer whitespace-nowrap"
+                  className="w-full relative overflow-hidden py-2.5 sm:py-3 px-3 bg-gradient-to-r from-[#ee4d2d] via-[#ff5722] to-[#ee4d2d] hover:brightness-105 text-white font-black text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 shadow-md shadow-orange-500/25 transition-all transform active:scale-[0.98] text-center cursor-pointer select-none"
                 >
+                  <AnimatePresence>
+                    {adRipples.map(ripple => (
+                      <motion.span
+                        key={ripple.id}
+                        initial={{
+                          scale: 0.05,
+                          opacity: 0.85,
+                        }}
+                        animate={{
+                          scale: 1,
+                          opacity: 0,
+                        }}
+                        exit={{ opacity: 0 }}
+                        transition={{
+                          duration: 0.55,
+                          ease: [0.16, 1, 0.3, 1],
+                        }}
+                        onAnimationComplete={() => {
+                          setAdRipples(prev => prev.filter(r => r.id !== ripple.id));
+                        }}
+                        className="absolute pointer-events-none -translate-x-1/2 -translate-y-1/2 z-30 will-change-transform"
+                        style={{
+                          left: ripple.x,
+                          top: ripple.y,
+                          width: ripple.width,
+                          height: ripple.height,
+                          borderRadius: '50%',
+                          background: `radial-gradient(ellipse at center, ${ripple.fill} 0%, ${ripple.fill} 40%, transparent 75%)`,
+                          border: `1.5px solid ${ripple.ring}`,
+                          transformOrigin: 'center center',
+                        }}
+                      />
+                    ))}
+                  </AnimatePresence>
                   <ShoppingBag className="w-4 h-4 flex-shrink-0" />
-                  <span className="whitespace-nowrap truncate">{ad.buttonText || 'Aproveitar Oferta na Shopee'}</span>
+                  <span className="leading-tight text-center truncate">{ad.buttonText || 'Aproveitar Oferta na Shopee'}</span>
                   <ExternalLink className="w-3.5 h-3.5 flex-shrink-0 opacity-85" />
                 </a>
 
                 {/* Safe Link Disclaimer */}
-                <div className="flex items-center justify-center gap-1 text-[10px] text-gray-400 whitespace-nowrap">
+                <div className="flex items-center justify-center gap-1 text-[10px] text-gray-400">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                  <span className="whitespace-nowrap">Link Oficial • Compra 100% Protegida</span>
+                  <span>Link Oficial • Compra 100% Protegida</span>
                 </div>
               </div>
             </motion.div>
@@ -860,7 +1039,7 @@ export const Preview: React.FC<PreviewProps> = ({
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.7, ease: "easeOut" }}
-            className="absolute inset-0 z-[100] flex items-center justify-center bg-white/5 backdrop-blur-2xl touch-none pointer-events-auto"
+            className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-2xl touch-none pointer-events-auto"
           >
             <div className="flex flex-col items-center gap-4 animate-pulse">
               <div className="w-10 h-10 rounded-full border-3 border-white/50 border-t-white animate-spin drop-shadow-md"></div>

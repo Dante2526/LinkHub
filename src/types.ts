@@ -73,6 +73,7 @@ export interface AppData {
   theme: Theme;
   links: LinkItem[];
   ad?: Advertisement;
+  updatedAt?: number;
 }
 
 export const defaultAd: Advertisement = {
@@ -92,7 +93,7 @@ export const defaultAd: Advertisement = {
 export const defaultTheme: Theme = {
   backgroundType: 'color',
   backgroundColor: '#f2f2f2',
-  backgroundGradient: 'linear-gradient(45deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%)',
+  backgroundGradient: 'linear-gradient(135deg, #18181b 0%, #09090b 100%)',
   backgroundImageUrl: '',
   backgroundVideoUrl: '',
   backgroundPositionMobile: { x: 50, y: 50 },

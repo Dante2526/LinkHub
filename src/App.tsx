@@ -23,6 +23,9 @@ const getInitialData = (): AppData | null => {
         if (!parsed.theme.linkTextAlign) parsed.theme.linkTextAlign = 'center';
         if (!parsed.theme.backgroundPositionMobile) parsed.theme.backgroundPositionMobile = { x: 50, y: 50 };
         if (!parsed.theme.backgroundPositionDesktop) parsed.theme.backgroundPositionDesktop = { x: 50, y: 50 };
+        if (parsed.theme.backgroundGradient && parsed.theme.backgroundGradient.includes('#ff9a9e')) {
+          parsed.theme.backgroundGradient = 'linear-gradient(135deg, #18181b 0%, #09090b 100%)';
+        }
       }
       if (!parsed.ad) {
         parsed.ad = { ...defaultAd };
@@ -171,32 +174,80 @@ function AdminView({
         </div>
 
         {/* Preview Area */}
-        <div className="flex-1 overflow-hidden flex items-center justify-center p-4 sm:p-8 isolate">
-          <div 
-            className={`
-              relative overflow-hidden transition-all duration-500 ease-in-out shadow-2xl shrink-0
-              ${previewMode === 'mobile' 
-                ? 'h-full max-h-[720px] aspect-[9/19] rounded-[2.5rem] border-[12px] border-black bg-black' 
-                : 'w-full h-full max-w-5xl rounded-3xl border border-gray-600 bg-gray-800'
-              }
-            `}
-          >
-            {/* Mobile Notch Mockup */}
-            {previewMode === 'mobile' && (
-              <div className="absolute top-0 inset-x-0 h-6 flex justify-center z-50 pointer-events-none">
-                <div className="w-20 h-5 bg-black rounded-b-2xl"></div>
+        <div className="flex-1 overflow-hidden flex items-center justify-center p-3 sm:p-6 md:p-8 isolate">
+          {previewMode === 'mobile' ? (
+            /* Flagship Smartphone Mockup (Titanium Edition com Dynamic Island) */
+            <div className="relative w-full max-w-[365px] sm:max-w-[385px] h-full max-h-[760px] flex items-center justify-center select-none transition-all duration-500 ease-out">
+              {/* Hardware Buttons - Left (Action Button + Volume Rockers) */}
+              <div className="absolute -left-[3.5px] top-[115px] w-[3.5px] h-[24px] bg-neutral-600/90 rounded-l-sm shadow-xs pointer-events-none" />
+              <div className="absolute -left-[3.5px] top-[152px] w-[3.5px] h-[46px] bg-neutral-600/90 rounded-l-sm shadow-xs pointer-events-none" />
+              <div className="absolute -left-[3.5px] top-[208px] w-[3.5px] h-[46px] bg-neutral-600/90 rounded-l-sm shadow-xs pointer-events-none" />
+
+              {/* Hardware Button - Right (Power / Side Button) */}
+              <div className="absolute -right-[3.5px] top-[162px] w-[3.5px] h-[72px] bg-neutral-600/90 rounded-r-sm shadow-xs pointer-events-none" />
+
+              {/* Chassi Titânio com Chanfro, Brilho Metálico e Sombra Profunda */}
+              <div className="w-full h-full p-[3.5px] rounded-[52px] bg-gradient-to-b from-[#52565e] via-[#2f333a] to-[#1a1c20] shadow-[0_25px_60px_-12px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.12),inset_0_1px_1px_rgba(255,255,255,0.35)] flex flex-col">
+                {/* Borda interna OLED ultrafina e display */}
+                <div className="w-full h-full p-[7px] bg-black rounded-[48.5px] ring-1 ring-white/10 relative overflow-hidden flex flex-col">
+                  {/* Superfície de Vidro da Tela */}
+                  <div className="w-full h-full rounded-[41px] overflow-hidden relative isolate bg-black flex flex-col">
+                    {/* Dynamic Island Flutuante */}
+                    <div className="absolute top-2.5 inset-x-0 flex justify-center z-50 pointer-events-none">
+                      <div className="h-[25px] w-[96px] bg-black rounded-full flex items-center justify-between px-2.5 shadow-[0_0_0_1px_rgba(255,255,255,0.08),0_4px_12px_rgba(0,0,0,0.5)]">
+                        {/* Lente da Câmera com micro reflexo óptico */}
+                        <div className="w-2.5 h-2.5 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center">
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-950/80 ring-1 ring-blue-500/20" />
+                        </div>
+                        {/* Sensor TrueDepth / Face ID */}
+                        <div className="w-2 h-2 rounded-full bg-[#080808]" />
+                      </div>
+                    </div>
+
+                    {/* Barra de Gestos Inferior (Home Indicator) */}
+                    <div className="absolute bottom-2 inset-x-0 flex justify-center z-50 pointer-events-none">
+                      <div className="w-32 h-1 rounded-full bg-white/40 backdrop-blur-xs shadow-xs" />
+                    </div>
+
+                    {/* Preview Real do LinkHub */}
+                    <MemoizedPreview 
+                      data={data} 
+                      onLinkClick={onLinkClick} 
+                      previewMode={previewMode}
+                      isRepositioning={isRepositioning}
+                      onRepositionEnd={() => setIsRepositioning(false)}
+                      onPositionChange={handlePositionChange}
+                    />
+                  </div>
+                </div>
               </div>
-            )}
-            
-            <MemoizedPreview 
-              data={data} 
-              onLinkClick={onLinkClick} 
-              previewMode={previewMode}
-              isRepositioning={isRepositioning}
-              onRepositionEnd={() => setIsRepositioning(false)}
-              onPositionChange={handlePositionChange}
-            />
-          </div>
+            </div>
+          ) : (
+            /* Desktop Mockup de Alta Resolução */
+            <div className="w-full h-full max-w-5xl rounded-3xl border border-gray-700 bg-gray-900 shadow-2xl relative overflow-hidden flex flex-col">
+              {/* Barra superior de janela de navegador */}
+              <div className="h-9 bg-gray-900 border-b border-gray-800 flex items-center px-4 gap-2 flex-shrink-0">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-[#ff5f56] border border-[#e0443e]" />
+                  <div className="w-3 h-3 rounded-full bg-[#ffbd2e] border border-[#dea123]" />
+                  <div className="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29]" />
+                </div>
+                <div className="mx-auto flex items-center gap-1.5 px-6 py-1 rounded-lg bg-gray-950/60 border border-gray-800 text-[11px] text-gray-400 font-mono">
+                  <span>linkhub.bio/meu-perfil</span>
+                </div>
+              </div>
+              <div className="flex-1 overflow-hidden relative">
+                <MemoizedPreview 
+                  data={data} 
+                  onLinkClick={onLinkClick} 
+                  previewMode={previewMode}
+                  isRepositioning={isRepositioning}
+                  onRepositionEnd={() => setIsRepositioning(false)}
+                  onPositionChange={handlePositionChange}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -224,7 +275,7 @@ export default function App() {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    document.title = 'Circuito0001';
+    document.title = 'LinkHub';
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
@@ -262,11 +313,26 @@ export default function App() {
           if (!fetchedData.theme.backgroundPositionDesktop) {
             fetchedData.theme.backgroundPositionDesktop = { x: 50, y: 50 };
           }
+          if (fetchedData.theme.backgroundGradient && fetchedData.theme.backgroundGradient.includes('#ff9a9e')) {
+            fetchedData.theme.backgroundGradient = 'linear-gradient(135deg, #18181b 0%, #09090b 100%)';
+          }
           if (!fetchedData.ad) {
             fetchedData.ad = { ...defaultAd };
           } else {
             fetchedData.ad = { ...defaultAd, ...fetchedData.ad };
           }
+          const serverVersion = fetchedData.updatedAt || 0;
+          const cachedVersion = Number(localStorage.getItem('linkhub_profile_version') || 0);
+
+          // Se o administrador alterou o tema ou adicionou links (versão mais recente):
+          if (serverVersion && serverVersion > cachedVersion) {
+            try {
+              // Limpa o cache antigo do localStorage do visitante
+              localStorage.removeItem(CACHE_KEY);
+              localStorage.setItem('linkhub_profile_version', String(serverVersion));
+            } catch (e) {}
+          }
+
           setData(prev => {
             // Evita re-render desnecessário se os dados locais já forem idênticos aos do Firestore
             if (prev && JSON.stringify(prev) === JSON.stringify(fetchedData)) {
@@ -276,15 +342,19 @@ export default function App() {
           });
           try {
             localStorage.setItem(CACHE_KEY, JSON.stringify(fetchedData));
+            if (serverVersion) {
+              localStorage.setItem('linkhub_profile_version', String(serverVersion));
+            }
           } catch (e) {
             console.error("Erro ao salvar cache", e);
           }
         } else {
-          const defaultData: AppData = { profile: defaultProfile, theme: defaultTheme, links: defaultLinks, ad: defaultAd };
+          const defaultData: AppData = { profile: defaultProfile, theme: defaultTheme, links: defaultLinks, ad: defaultAd, updatedAt: Date.now() };
           setDoc(docRef, defaultData).catch(console.error);
           setData(defaultData);
           try {
             localStorage.setItem(CACHE_KEY, JSON.stringify(defaultData));
+            localStorage.setItem('linkhub_profile_version', String(defaultData.updatedAt || Date.now()));
           } catch (e) {}
         }
         setLoading(false);
@@ -308,11 +378,17 @@ export default function App() {
   const handleUpdateData = useCallback((updater: AppData | ((prev: AppData) => AppData)) => {
     setData(prev => {
       if (!prev) return prev;
-      const newData = typeof updater === 'function' ? updater(prev) : updater;
+      const raw = typeof updater === 'function' ? updater(prev) : updater;
+      const now = Date.now();
+      const newData: AppData = {
+        ...raw,
+        updatedAt: now,
+      };
       
       // Atualização imediata no cache do navegador para resposta visual instantânea (60 FPS)
       try {
         localStorage.setItem(CACHE_KEY, JSON.stringify(newData));
+        localStorage.setItem('linkhub_profile_version', String(now));
       } catch (e) {}
 
       // Debounce inteligente na gravação do Firestore (evita dezenas de escritas por segundo enquanto digita)
