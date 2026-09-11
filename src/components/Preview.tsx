@@ -542,6 +542,9 @@ export const Preview: React.FC<PreviewProps> = ({
             const linkBgColor = link.buttonColor || theme.buttonColor || '#ffffff';
             const thumbPos = link.thumbnailPosition || theme.linkThumbnailPosition || 'left';
             const isRight = thumbPos === 'right';
+            const normalizedUrl = link.url?.trim() 
+              ? (/^(https?:\/\/|mailto:|tel:)/i.test(link.url.trim()) ? link.url.trim() : `https://${link.url.trim()}`) 
+              : '#';
 
             return (
               <motion.a 
@@ -550,7 +553,7 @@ export const Preview: React.FC<PreviewProps> = ({
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
                 key={link.id} 
-                href={link.url} 
+                href={normalizedUrl} 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className={`${getButtonStyle(theme)} overflow-hidden transition-all`}

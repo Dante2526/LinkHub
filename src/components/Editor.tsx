@@ -301,11 +301,11 @@ export const Editor: React.FC<EditorProps> = ({
     const newLink: LinkItem = {
       id: Date.now().toString(),
       title: 'Novo Link',
-      url: 'https://',
+      url: '',
       thumbnailUrl: '',
       isVisible: true,
     };
-    onChange({ ...data, links: [...data.links, newLink] });
+    onChange({ ...data, links: [newLink, ...data.links] });
   };
 
   const updateLink = (id: string, field: keyof LinkItem, value: any) => {
