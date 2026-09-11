@@ -165,6 +165,28 @@ export const Preview: React.FC<PreviewProps> = ({
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string | null>(null);
   const [isVideoReady, setIsVideoReady] = useState(false);
+  
+  const [isBackgroundReady, setIsBackgroundReady] = useState(() => {
+    return theme.backgroundType !== 'image' && theme.backgroundType !== 'video';
+  });
+
+  useEffect(() => {
+    if (theme.backgroundType === 'image' && theme.backgroundImageUrl) {
+      setIsBackgroundReady(false);
+      const img = new Image();
+      img.src = theme.backgroundImageUrl;
+      if (img.complete) {
+        setIsBackgroundReady(true);
+      } else {
+        img.onload = () => setIsBackgroundReady(true);
+        img.onerror = () => setIsBackgroundReady(true);
+      }
+    } else if (theme.backgroundType === 'video') {
+      setIsBackgroundReady(isVideoReady);
+    } else {
+      setIsBackgroundReady(true);
+    }
+  }, [theme.backgroundType, theme.backgroundImageUrl, isVideoReady]);
 
   // Responsive device mode detection for PublicView or dynamic window sizes
   const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1024);
@@ -789,6 +811,23 @@ export const Preview: React.FC<PreviewProps> = ({
                 </div>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Liquid Glass Loading Overlay */}
+      <AnimatePresence>
+        {!isBackgroundReady && (
+          <motion.div 
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.7, ease: "easeOut" }}
+            className="absolute inset-0 z-[100] flex items-center justify-center bg-white/5 backdrop-blur-2xl touch-none pointer-events-auto"
+          >
+            <div className="flex flex-col items-center gap-4 animate-pulse">
+              <div className="w-10 h-10 rounded-full border-3 border-white/50 border-t-white animate-spin drop-shadow-md"></div>
+              <p className="text-white text-sm font-medium tracking-wide drop-shadow-md">Carregando...</p>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
