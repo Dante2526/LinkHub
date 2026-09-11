@@ -184,28 +184,45 @@ interface EllipseRipple {
   width: number;
   height: number;
   fill: string;
-  ring: string;
+  border: string;
 }
 
-const getRippleColors = (bgColor?: string, textColor?: string) => {
-  if (bgColor && bgColor.startsWith('#') && (bgColor.length === 7 || bgColor.length === 4)) {
-    const hex = bgColor.length === 4 
-      ? `#${bgColor[1]}${bgColor[1]}${bgColor[2]}${bgColor[2]}${bgColor[3]}${bgColor[3]}` 
-      : bgColor;
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-    if (lum > 0.65) {
-      return {
-        fill: 'rgba(0, 0, 0, 0.2)',
-        ring: 'rgba(0, 0, 0, 0.35)',
-      };
+const hexToRgba = (color: string | undefined, alpha: number, fallback: string) => {
+  if (!color) return fallback;
+  const c = color.trim();
+  if (c.startsWith('#')) {
+    const hex = c.length === 4 
+      ? `#${c[1]}${c[1]}${c[2]}${c[2]}${c[3]}${c[3]}` 
+      : c;
+    if (hex.length === 7) {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     }
   }
+  if (c.startsWith('rgb')) {
+    return c.replace('rgb(', 'rgba(').replace(')', `, ${alpha})`);
+  }
+  return fallback;
+};
+
+const getThemeRippleColors = (
+  theme: Theme,
+  linkBgColor?: string,
+  linkTextColor?: string
+) => {
+  let targetColor = linkTextColor || theme.buttonTextColor || '#000000';
+  
+  if (theme.buttonStyle === 'outline') {
+    targetColor = linkBgColor || theme.buttonColor || linkTextColor || theme.buttonTextColor || '#000000';
+  } else if (theme.buttonStyle === 'glass') {
+    targetColor = linkTextColor || theme.profileTextColor || '#ffffff';
+  }
+
   return {
-    fill: 'rgba(255, 255, 255, 0.45)',
-    ring: 'rgba(255, 255, 255, 0.75)',
+    fill: hexToRgba(targetColor, 0.2, 'rgba(0, 0, 0, 0.15)'),
+    border: hexToRgba(targetColor, 0.4, 'rgba(0, 0, 0, 0.3)'),
   };
 };
 
@@ -228,51 +245,58 @@ const LinkItemCard: React.FC<LinkItemCardProps> = ({ link, theme, onLinkClick })
     ? (/^(https?:\/\/|mailto:|tel:)/i.test(link.url.trim()) ? link.url.trim() : `https://${link.url.trim()}`) 
     : '#';
 
-  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clientX = e.clientX || (rect.left + rect.width / 2);
-    const clientY = e.clientY || (rect.top + rect.height / 2);
+  const triggerRipple = (clientX: number, clientY: number, rect: DOMRect) => {
     const x = clientX - rect.left;
     const y = clientY - rect.top;
 
-    // Distância máxima para preencher todo o botão partindo das coordenadas do clique
+    // Distância máxima do ponto do clique até o canto mais distante do botão
     const distX = Math.max(x, rect.width - x);
     const distY = Math.max(y, rect.height - y);
     const maxRadius = Math.hypot(distX, distY);
 
-    // Geometria em elipse: mais larga horizontalmente do que verticalmente para acompanhar a silhueta do botão
-    const width = Math.max(maxRadius * 2.6, rect.width * 1.5);
+    // Geometria em elipse: cobrindo amplamente o formato horizontal do botão
+    const width = Math.max(maxRadius * 2.8, rect.width * 1.4);
     const height = Math.max(maxRadius * 1.6, rect.height * 2.2);
 
-    const colors = getRippleColors(
-      theme.buttonStyle === 'solid' ? linkBgColor : undefined,
+    const colors = getThemeRippleColors(
+      theme,
+      linkBgColor,
       linkTextColor
     );
 
     const id = Date.now() + Math.random();
-    setRipples(prev => [...prev.slice(-3), {
+    setRipples(prev => [...prev.slice(-2), {
       id,
       x,
       y,
       width,
       height,
       fill: colors.fill,
-      ring: colors.ring,
+      border: colors.border,
     }]);
+  };
 
-    setTimeout(() => {
-      setRipples(prev => prev.filter(r => r.id !== id));
-    }, 800);
+  const handlePointerDown = (e: React.PointerEvent<HTMLAnchorElement>) => {
+    if (e.button !== 0) return; // apenas clique principal / toque
+    triggerRipple(e.clientX, e.clientY, e.currentTarget.getBoundingClientRect());
+  };
 
+  const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    // Se ativado via teclado (acessibilidade)
+    if (e.clientX === 0 && e.clientY === 0) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      triggerRipple(rect.left + rect.width / 2, rect.top + rect.height / 2, rect);
+    }
     onLinkClick?.(link.id);
   };
 
   return (
     <motion.a 
+      onPointerDown={handlePointerDown}
       onClick={handleClick}
       variants={getAnimationVariants(link.animation)}
       whileHover={{ scale: 1.02, y: -2 }}
-      whileTap={{ scale: 0.98 }}
+      whileTap={{ scale: 0.995 }}
       href={normalizedUrl} 
       target="_blank" 
       rel="noopener noreferrer"
@@ -285,37 +309,43 @@ const LinkItemCard: React.FC<LinkItemCardProps> = ({ link, theme, onLinkClick })
             : { color: linkTextColor }
       }
     >
-      {/* GPU-Accelerated Expanding Ellipse Wavefront from Click Point */}
+      {/* Dynamic Wavefront: inicia circular no ponto do clique e se expande em elipse luminosa */}
       <AnimatePresence>
         {ripples.map(ripple => (
           <motion.span
             key={ripple.id}
             initial={{
-              scale: 0.05,
-              opacity: 0.85,
+              x: '-50%',
+              y: '-50%',
+              scaleX: 0,
+              scaleY: 0,
+              opacity: 0.95,
             }}
             animate={{
-              scale: 1,
-              opacity: 0,
+              x: '-50%',
+              y: '-50%',
+              scaleX: [0, 0.45, 1],
+              scaleY: [0, 0.65, 1],
+              opacity: [0.95, 0.8, 0],
             }}
             exit={{ opacity: 0 }}
             transition={{
-              duration: 0.55,
+              duration: 0.75,
+              times: [0, 0.35, 1],
               ease: [0.16, 1, 0.3, 1],
             }}
             onAnimationComplete={() => {
               setRipples(prev => prev.filter(r => r.id !== ripple.id));
             }}
-            className="absolute pointer-events-none -translate-x-1/2 -translate-y-1/2 z-30 will-change-transform"
+            className="absolute pointer-events-none z-30 will-change-transform"
             style={{
               left: ripple.x,
               top: ripple.y,
               width: ripple.width,
               height: ripple.height,
               borderRadius: '50%',
-              background: `radial-gradient(ellipse at center, ${ripple.fill} 0%, ${ripple.fill} 40%, transparent 75%)`,
-              border: `1.5px solid ${ripple.ring}`,
-              transformOrigin: 'center center',
+              background: `radial-gradient(ellipse at center, ${ripple.fill} 0%, ${ripple.fill} 50%, transparent 85%)`,
+              border: `1.5px solid ${ripple.border}`,
             }}
           />
         ))}
@@ -539,10 +569,8 @@ export const Preview: React.FC<PreviewProps> = ({
     setIsAdOpen(false);
   };
 
-  const handleAdCtaClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clientX = e.clientX || (rect.left + rect.width / 2);
-    const clientY = e.clientY || (rect.top + rect.height / 2);
+  const triggerAdRipple = (clientX: number, clientY: number, target: HTMLElement) => {
+    const rect = target.getBoundingClientRect();
     const x = clientX - rect.left;
     const y = clientY - rect.top;
     const maxRadius = Math.hypot(Math.max(x, rect.width - x), Math.max(y, rect.height - y));
@@ -551,18 +579,27 @@ export const Preview: React.FC<PreviewProps> = ({
       id,
       x,
       y,
-      width: maxRadius * 2.6,
-      height: maxRadius * 1.6,
-      fill: 'rgba(255, 255, 255, 0.45)',
-      ring: 'rgba(255, 255, 255, 0.75)',
+      width: Math.max(maxRadius * 2.8, rect.width * 1.4),
+      height: Math.max(maxRadius * 1.6, rect.height * 2.2),
+      fill: 'rgba(255, 255, 255, 0.22)',
+      border: 'rgba(255, 255, 255, 0.45)',
     }]);
-    setTimeout(() => {
-      setAdRipples(prev => prev.filter(r => r.id !== id));
-    }, 800);
+  };
+
+  const handleAdPointerDown = (e: React.PointerEvent<HTMLAnchorElement>) => {
+    if (e.button !== 0) return;
+    triggerAdRipple(e.clientX, e.clientY, e.currentTarget);
+  };
+
+  const handleAdCtaClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (e.clientX === 0 && e.clientY === 0) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      triggerAdRipple(rect.left + rect.width / 2, rect.top + rect.height / 2, e.currentTarget);
+    }
     localStorage.setItem('linkhub_last_ad_seen', Date.now().toString());
     setTimeout(() => {
       setIsAdOpen(false);
-    }, 250);
+    }, 450);
   };
 
   useEffect(() => {
@@ -979,39 +1016,46 @@ export const Preview: React.FC<PreviewProps> = ({
                   href={ad.buttonUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onPointerDown={handleAdPointerDown}
                   onClick={handleAdCtaClick}
-                  className="w-full relative overflow-hidden py-2.5 sm:py-3 px-3 bg-gradient-to-r from-[#ee4d2d] via-[#ff5722] to-[#ee4d2d] hover:brightness-105 text-white font-black text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 shadow-md shadow-orange-500/25 transition-all transform active:scale-[0.98] text-center cursor-pointer select-none"
+                  className="w-full relative overflow-hidden py-2.5 sm:py-3 px-3 bg-gradient-to-r from-[#ee4d2d] via-[#ff5722] to-[#ee4d2d] hover:brightness-105 text-white font-black text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 shadow-md shadow-orange-500/25 transition-all select-none cursor-pointer"
                 >
                   <AnimatePresence>
                     {adRipples.map(ripple => (
                       <motion.span
                         key={ripple.id}
                         initial={{
-                          scale: 0.05,
-                          opacity: 0.85,
+                          x: '-50%',
+                          y: '-50%',
+                          scaleX: 0,
+                          scaleY: 0,
+                          opacity: 0.95,
                         }}
                         animate={{
-                          scale: 1,
-                          opacity: 0,
+                          x: '-50%',
+                          y: '-50%',
+                          scaleX: [0, 0.45, 1],
+                          scaleY: [0, 0.65, 1],
+                          opacity: [0.95, 0.8, 0],
                         }}
                         exit={{ opacity: 0 }}
                         transition={{
-                          duration: 0.55,
+                          duration: 0.75,
+                          times: [0, 0.35, 1],
                           ease: [0.16, 1, 0.3, 1],
                         }}
                         onAnimationComplete={() => {
                           setAdRipples(prev => prev.filter(r => r.id !== ripple.id));
                         }}
-                        className="absolute pointer-events-none -translate-x-1/2 -translate-y-1/2 z-30 will-change-transform"
+                        className="absolute pointer-events-none z-30 will-change-transform"
                         style={{
                           left: ripple.x,
                           top: ripple.y,
                           width: ripple.width,
                           height: ripple.height,
                           borderRadius: '50%',
-                          background: `radial-gradient(ellipse at center, ${ripple.fill} 0%, ${ripple.fill} 40%, transparent 75%)`,
-                          border: `1.5px solid ${ripple.ring}`,
-                          transformOrigin: 'center center',
+                          background: `radial-gradient(ellipse at center, ${ripple.fill} 0%, ${ripple.fill} 50%, transparent 85%)`,
+                          border: `1.5px solid ${ripple.border}`,
                         }}
                       />
                     ))}
