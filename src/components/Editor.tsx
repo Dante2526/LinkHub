@@ -1856,6 +1856,56 @@ export const Editor: React.FC<EditorProps> = ({
                 </p>
               </div>
 
+              {/* Card Destaque: Intenção de Compra (Propaganda / Shopee) */}
+              <div className="relative overflow-hidden rounded-3xl p-5 sm:p-6 border border-orange-500/30 bg-gradient-to-br from-orange-950/40 via-gray-800 to-gray-800 shadow-lg shadow-orange-950/20">
+                <div className="absolute top-0 right-0 w-44 h-44 bg-gradient-to-bl from-orange-500/10 to-transparent rounded-full blur-2xl pointer-events-none" />
+                
+                <div className="flex items-start justify-between gap-3 mb-4 relative z-10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#ee4d2d] to-[#ff5722] text-white flex items-center justify-center shadow-md shadow-orange-500/30 flex-shrink-0">
+                      <ShoppingBag className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-base sm:text-lg font-bold text-white">Intenção de Compra</h4>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-orange-500/20 text-[#ff7a45] border border-orange-500/30">
+                          {data.ad?.enabled ? 'Propaganda Ativa' : 'Propaganda Pausada'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-400 line-clamp-1 mt-0.5">
+                        {data.ad?.title || 'Achadinho Exclusivo na Shopee'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setActiveTab('ad')}
+                    className="text-xs font-semibold text-orange-400 hover:text-orange-300 hover:underline transition-colors flex items-center gap-1 flex-shrink-0 pt-1 cursor-pointer"
+                  >
+                    <span>Configurar</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-3 border-t border-gray-700/50 relative z-10">
+                  <div className="bg-gray-900/60 rounded-2xl p-3 border border-orange-500/15">
+                    <span className="text-[11px] sm:text-xs font-medium text-gray-400 block mb-1">Cliques no Produto</span>
+                    <div className="flex items-baseline gap-1.5 flex-wrap">
+                      <span className="text-2xl sm:text-3xl font-black text-white">{metrics.adClicks}</span>
+                      <span className="text-xs font-medium text-orange-400">intenções</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-900/60 rounded-2xl p-3 border border-orange-500/15">
+                    <span className="text-[11px] sm:text-xs font-medium text-gray-400 block mb-1">Taxa de Conversão</span>
+                    <div className="flex items-baseline gap-1.5 flex-wrap">
+                      <span className="text-2xl sm:text-3xl font-black text-[#ee4d2d]">{metrics.adConversionRate}%</span>
+                      <span className="text-[10px] text-gray-500 font-medium">dos visitantes</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-gray-800 rounded-3xl p-5 shadow-sm border border-gray-700/50 flex flex-col items-center justify-center text-center gap-2">
                   <Eye className="w-6 h-6 text-purple-500 mb-1" />
@@ -1888,8 +1938,37 @@ export const Editor: React.FC<EditorProps> = ({
                 </h3>
               
               <div className="space-y-5">
+                {/* Linha destacada da Propaganda Shopee */}
+                {(metrics.adClicks > 0 || data.ad?.enabled) && (
+                  <div className="p-3.5 rounded-2xl bg-gradient-to-r from-orange-950/30 via-gray-900/60 to-gray-900/40 border border-orange-500/25 space-y-2">
+                    <div className="flex justify-between items-center text-sm gap-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-[#ee4d2d] text-white shadow-xs flex-shrink-0 flex items-center gap-1">
+                          <Sparkles className="w-2.5 h-2.5 text-yellow-300" />
+                          Propaganda
+                        </span>
+                        <span className="font-bold text-orange-200 truncate">
+                          {data.ad?.title || 'Oferta Shopee'}
+                        </span>
+                      </div>
+                      <span className="font-black text-orange-400 bg-orange-500/15 border border-orange-500/20 px-2.5 py-0.5 rounded-lg text-xs flex-shrink-0 flex items-center gap-1">
+                        <ShoppingBag className="w-3.5 h-3.5 text-orange-400" />
+                        {metrics.adClicks} intenções
+                      </span>
+                    </div>
+                    <div className="h-2 w-full bg-gray-950/60 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-[#ee4d2d] to-[#ff7a45] rounded-full transition-all duration-1000 ease-out" 
+                        style={{ 
+                          width: `${Math.min(100, Math.round((metrics.adClicks / Math.max(1, ...data.links.map(l => metrics.clicksByLink[l.id] || 0), metrics.adClicks)) * 100))}%` 
+                        }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
+
                 {data.links.filter(l => l.isVisible).sort((a, b) => (metrics.clicksByLink[b.id] || 0) - (metrics.clicksByLink[a.id] || 0)).map((link, idx) => {
-                  const maxClicks = Math.max(...data.links.map(l => metrics.clicksByLink[l.id] || 0), 1);
+                  const maxClicks = Math.max(...data.links.map(l => metrics.clicksByLink[l.id] || 0), metrics.adClicks, 1);
                   const linkClicks = metrics.clicksByLink[link.id] || 0;
                   const percentage = Math.round((linkClicks / maxClicks) * 100);
                   
@@ -1913,7 +1992,7 @@ export const Editor: React.FC<EditorProps> = ({
                   );
                 })}
 
-                {data.links.filter(l => l.isVisible).length === 0 && (
+                {data.links.filter(l => l.isVisible).length === 0 && metrics.adClicks === 0 && !data.ad?.enabled && (
                   <div className="text-center py-6 text-gray-500 text-sm">
                     Adicione links visíveis para ver as métricas.
                   </div>
