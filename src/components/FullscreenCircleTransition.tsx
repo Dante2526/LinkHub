@@ -4,6 +4,8 @@ export interface CircleTransitionData {
   x: number;
   y: number;
   color: string;
+  background?: string;
+  borderColor?: string;
   textColor?: string;
 }
 
@@ -25,6 +27,8 @@ export const FullscreenCircleTransition: React.FC<FullscreenCircleTransitionProp
     y: number;
     radius: number;
     color: string;
+    background?: string;
+    borderColor?: string;
     textColor: string;
   } | null>(null);
 
@@ -37,7 +41,7 @@ export const FullscreenCircleTransition: React.FC<FullscreenCircleTransitionProp
       return;
     }
 
-    const { x, y, color, textColor = '#ffffff' } = transitionData;
+    const { x, y, color, background, borderColor, textColor = '#ffffff' } = transitionData;
 
     // Obter dimensões do container do preview ou da janela
     let containerWidth = window.innerWidth;
@@ -59,6 +63,8 @@ export const FullscreenCircleTransition: React.FC<FullscreenCircleTransitionProp
       y,
       radius,
       color: color || '#18181b',
+      background: background || color || '#18181b',
+      borderColor: borderColor || color || '#3b82f6',
       textColor,
     });
     setPhase('expanding');
@@ -95,19 +101,20 @@ export const FullscreenCircleTransition: React.FC<FullscreenCircleTransitionProp
         '--circle-r': `${styleParams.radius}px`,
       } as React.CSSProperties}
     >
-      {/* Camada principal de preenchimento com a expansão circular */}
+      {/* Camada principal de preenchimento com a expansão circular na cor do tema */}
       <div
         className="absolute inset-0 fullscreen-circle-layer"
         style={{
+          background: styleParams.background || styleParams.color,
           backgroundColor: styleParams.color,
         }}
       />
 
-      {/* Anel de brilho sutil na frente da onda circular */}
+      {/* Anel de destaque frontal na cor do tema */}
       <div
         className="absolute inset-0 fullscreen-circle-shockwave"
         style={{
-          borderColor: styleParams.textColor,
+          borderColor: styleParams.borderColor || styleParams.color,
         }}
       />
     </div>
