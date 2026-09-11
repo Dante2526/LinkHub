@@ -407,9 +407,18 @@ export default function App() {
 
   const handleLinkClick = useCallback((linkId: string) => {
     if (isFirebaseConfigured) {
-      addDoc(collection(db, 'cliques'), { linkId, time: Date.now() }).catch(console.error);
+      if (linkId === '__advertisement__') {
+        addDoc(collection(db, 'cliques'), { 
+          linkId: '__advertisement__', 
+          isAd: true, 
+          title: data?.ad?.title || 'Oferta Shopee', 
+          time: Date.now() 
+        }).catch(console.error);
+      } else {
+        addDoc(collection(db, 'cliques'), { linkId, time: Date.now() }).catch(console.error);
+      }
     }
-  }, []);
+  }, [data?.ad?.title]);
 
   const handleView = useCallback(() => {
     const hasViewed = sessionStorage.getItem('linkhub_has_viewed');

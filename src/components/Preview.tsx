@@ -708,6 +708,11 @@ export const Preview: React.FC<PreviewProps> = ({
     if (isAdOpeningRef.current) return;
     isAdOpeningRef.current = true;
 
+    // Rastreia a intenção de compra da propaganda
+    if (onLinkClick) {
+      onLinkClick('__advertisement__');
+    }
+
     localStorage.setItem('linkhub_last_ad_seen', Date.now().toString());
 
     handleTriggerCircleTransition({
