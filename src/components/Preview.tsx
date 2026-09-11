@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { FullscreenCircleTransition, CircleTransitionData } from './FullscreenCircleTransition';
 import { AppData, Theme, BackgroundPosition, ThumbnailShape, ButtonRadius, LinkItem } from '../types';
 import { Share2, X, ShoppingBag, ExternalLink, Clock, ShieldCheck, Sparkles, Move, Check, RotateCcw, Truck, Flame, Tag } from 'lucide-react';
 import { db, isFirebaseConfigured } from '../lib/firebase';
@@ -230,9 +231,21 @@ interface LinkItemCardProps {
   link: LinkItem;
   theme: Theme;
   onLinkClick?: (id: string) => void;
+  onTriggerCircleTransition?: (params: {
+    clientX: number;
+    clientY: number;
+    color: string;
+    textColor?: string;
+    url?: string;
+  }) => void;
 }
 
-const LinkItemCard: React.FC<LinkItemCardProps> = ({ link, theme, onLinkClick }) => {
+const LinkItemCard: React.FC<LinkItemCardProps> = ({ 
+  link, 
+  theme, 
+  onLinkClick,
+  onTriggerCircleTransition,
+}) => {
   const [ripples, setRipples] = useState<EllipseRipple[]>([]);
   const isNavigatingRef = useRef(false);
   const format = theme.linkFormat || 'classic';
@@ -298,7 +311,33 @@ const LinkItemCard: React.FC<LinkItemCardProps> = ({ link, theme, onLinkClick })
     isNavigatingRef.current = true;
 
     const targetUrl = normalizedUrl;
-    // Aguarda a animação da elipse se expandir por completo antes de abrir o link
+
+    // Determina a cor de preenchimento da expansão circular estilo PAINEL-DSS
+    let transitionColor = linkBgColor;
+    if (theme.buttonStyle === 'outline') {
+      transitionColor = link.buttonColor || theme.buttonColor || linkTextColor || '#2563eb';
+    } else if (theme.buttonStyle === 'glass') {
+      transitionColor = link.textColor || theme.profileTextColor || '#3b82f6';
+    }
+    if (!transitionColor || transitionColor === 'transparent') {
+      transitionColor = '#18181b';
+    }
+
+    if (onTriggerCircleTransition) {
+      onTriggerCircleTransition({
+        clientX,
+        clientY,
+        color: transitionColor,
+        textColor: linkTextColor,
+        url: targetUrl,
+      });
+      setTimeout(() => {
+        isNavigatingRef.current = false;
+      }, 800);
+      return;
+    }
+
+    // Fallback caso não haja trigger configurado
     setTimeout(() => {
       isNavigatingRef.current = false;
       if (targetUrl && targetUrl !== '#') {
@@ -446,6 +485,56 @@ export const Preview: React.FC<PreviewProps> = ({
   const { profile, theme, links, ad } = data;
   const isAnimated = theme.backgroundType === 'animated-gradient';
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [circleTransition, setCircleTransition] = useState<CircleTransitionData | null>(null);
+  const pendingNavigationUrlRef = useRef<string | null>(null);
+
+  const handleTriggerCircleTransition = useCallback(({
+    clientX,
+    clientY,
+    color,
+    textColor,
+    url,
+  }: {
+    clientX: number;
+    clientY: number;
+    color: string;
+    textColor?: string;
+    url?: string;
+  }) => {
+    let relativeX = clientX;
+    let relativeY = clientY;
+
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      relativeX = clientX - rect.left;
+      relativeY = clientY - rect.top;
+    }
+
+    pendingNavigationUrlRef.current = url || null;
+
+    setCircleTransition({
+      x: relativeX,
+      y: relativeY,
+      color,
+      textColor,
+    });
+  }, []);
+
+  const handleCircleReadyToNavigate = useCallback(() => {
+    const targetUrl = pendingNavigationUrlRef.current;
+    if (targetUrl && targetUrl !== '#') {
+      if (targetUrl.startsWith('mailto:') || targetUrl.startsWith('tel:')) {
+        window.location.href = targetUrl;
+      } else {
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      }
+    }
+  }, []);
+
+  const handleCircleFinished = useCallback(() => {
+    setCircleTransition(null);
+    pendingNavigationUrlRef.current = null;
+  }, []);
   const [resolvedVideoUrl, setResolvedVideoUrl] = useState<string | null>(null);
   const [isVideoReady, setIsVideoReady] = useState(false);
   
@@ -620,12 +709,18 @@ export const Preview: React.FC<PreviewProps> = ({
     isAdOpeningRef.current = true;
 
     localStorage.setItem('linkhub_last_ad_seen', Date.now().toString());
+
+    handleTriggerCircleTransition({
+      clientX,
+      clientY,
+      color: '#ee4d2d',
+      textColor: '#ffffff',
+      url: ad.buttonUrl,
+    });
+
     setTimeout(() => {
       isAdOpeningRef.current = false;
       setIsAdOpen(false);
-      if (ad.buttonUrl) {
-        window.open(ad.buttonUrl, '_blank', 'noopener,noreferrer');
-      }
     }, 450);
   };
 
@@ -708,6 +803,13 @@ export const Preview: React.FC<PreviewProps> = ({
       className={`relative w-full h-full overflow-hidden ${isAnimated ? 'animated-gradient-bg' : ''}`} 
       style={{ ...getBackgroundStyle(theme, activePosition), fontFamily: theme.fontFamily }}
     >
+      {/* Fullscreen Circle Transition Overlay (Estilo PAINEL-DSS) */}
+      <FullscreenCircleTransition
+        transitionData={circleTransition}
+        containerRef={containerRef}
+        onReadyToNavigate={handleCircleReadyToNavigate}
+        onFinished={handleCircleFinished}
+      />
       {/* Video Background Layer (alta prioridade, preload e transição suave por GPU) */}
       {theme.backgroundType === 'video' && resolvedVideoUrl && (
         <video 
@@ -865,6 +967,7 @@ export const Preview: React.FC<PreviewProps> = ({
               link={link} 
               theme={theme} 
               onLinkClick={onLinkClick} 
+              onTriggerCircleTransition={handleTriggerCircleTransition}
             />
           ))}
         </motion.div>

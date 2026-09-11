@@ -28,3 +28,42 @@
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
 }
+
+/* === FULLSCREEN CIRCLE TRANSITION (Inspirado no PAINEL-DSS) === */
+@keyframes fullscreen-circle-expand {
+  0% {
+    clip-path: circle(0px at var(--circle-x, 50%) var(--circle-y, 50%));
+  }
+  100% {
+    clip-path: circle(var(--circle-r, 150%) at var(--circle-x, 50%) var(--circle-y, 50%));
+  }
+}
+
+@keyframes fullscreen-circle-fade {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.fullscreen-circle-layer {
+  clip-path: circle(0px at var(--circle-x, 50%) var(--circle-y, 50%));
+  animation: fullscreen-circle-expand 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  will-change: clip-path;
+  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.25);
+}
+
+.fullscreen-circle-shockwave {
+  clip-path: circle(0px at var(--circle-x, 50%) var(--circle-y, 50%));
+  animation: fullscreen-circle-expand 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  will-change: clip-path;
+  opacity: 0.35;
+  filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.5));
+  pointer-events: none;
+}
+
+.fullscreen-circle-fading {
+  animation: fullscreen-circle-fade 0.25s ease-out forwards;
+}
