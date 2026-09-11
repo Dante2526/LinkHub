@@ -208,22 +208,100 @@ const hexToRgba = (color: string | undefined, alpha: number, fallback: string) =
   return fallback;
 };
 
-const getThemeRippleColors = (
-  theme: Theme,
-  linkBgColor?: string,
-  linkTextColor?: string
-) => {
-  let targetColor = linkTextColor || theme.buttonTextColor || '#000000';
-  
-  if (theme.buttonStyle === 'outline') {
-    targetColor = linkBgColor || theme.buttonColor || linkTextColor || theme.buttonTextColor || '#000000';
-  } else if (theme.buttonStyle === 'glass') {
-    targetColor = linkTextColor || theme.profileTextColor || '#ffffff';
+const getAppliedThemeColors = (theme: Theme, link?: LinkItem) => {
+  // 1. Se o link individual possuir cor personalizada definida e não for branco/transparente
+  const linkCustomColor = link?.buttonColor?.trim();
+  const isLinkCustom = !!(
+    linkCustomColor &&
+    linkCustomColor !== 'transparent' &&
+    linkCustomColor.toLowerCase() !== '#ffffff' &&
+    linkCustomColor.toLowerCase() !== '#fff'
+  );
+
+  // 2. Se a cor dos botões no tema for personalizada e não for branca/transparente
+  const themeButtonCustom = theme.buttonColor?.trim();
+  const isThemeButtonCustom = !!(
+    themeButtonCustom &&
+    themeButtonCustom !== 'transparent' &&
+    themeButtonCustom.toLowerCase() !== '#ffffff' &&
+    themeButtonCustom.toLowerCase() !== '#fff'
+  );
+
+  // 3. Extrair cores do tema aplicado no momento (gradiente ou cor sólida)
+  let themeBaseColor = '#18181b';
+  let themeBackground = '';
+  let themeAccent = '#2563eb';
+
+  if (theme.backgroundType === 'gradient' || theme.backgroundType === 'animated-gradient') {
+    themeBackground = theme.backgroundGradient || 'linear-gradient(135deg, #18181b 0%, #09090b 100%)';
+    const matches = themeBackground.match(/#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})|rgba?\([^)]+\)/g);
+    if (matches && matches.length > 0) {
+      themeBaseColor = matches[0];
+      themeAccent = matches.length > 1 ? matches[1] : matches[0];
+    }
+  } else if (theme.backgroundType === 'color') {
+    themeBaseColor = theme.backgroundColor || '#18181b';
+    themeBackground = themeBaseColor;
+    themeAccent = themeBaseColor;
+  } else {
+    // image ou video
+    themeBaseColor = theme.backgroundColor || '#18181b';
+    themeBackground = themeBaseColor;
+    themeAccent = '#2563eb';
+  }
+
+  // 4. Seleção da cor e fundo da transição
+  let finalColor = themeBaseColor;
+  let finalBackground = themeBackground || themeBaseColor;
+  let finalBorder = themeAccent;
+
+  if (isLinkCustom) {
+    finalColor = linkCustomColor!;
+    finalBackground = linkCustomColor!;
+    finalBorder = linkCustomColor!;
+  } else if (isThemeButtonCustom) {
+    finalColor = themeButtonCustom!;
+    finalBackground = themeButtonCustom!;
+    finalBorder = themeButtonCustom!;
+  }
+
+  // Se por acaso finalColor for branco ou quase transparente,
+  // busca a primeira cor do gradiente ou destaque para garantir que NUNCA aconteça em branco
+  if (
+    finalColor.toLowerCase() === '#ffffff' ||
+    finalColor.toLowerCase() === '#fff' ||
+    finalColor === 'transparent'
+  ) {
+    if (theme.backgroundGradient) {
+      const matches = theme.backgroundGradient.match(/#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})|rgba?\([^)]+\)/g);
+      const nonWhite = matches?.find(m => m.toLowerCase() !== '#ffffff' && m.toLowerCase() !== '#fff');
+      if (nonWhite) {
+        finalColor = nonWhite;
+        finalBackground = theme.backgroundGradient;
+        finalBorder = nonWhite;
+      } else {
+        finalColor = '#18181b';
+        finalBackground = '#18181b';
+        finalBorder = '#3b82f6';
+      }
+    } else if (theme.buttonTextColor && theme.buttonTextColor.toLowerCase() !== '#000000' && theme.buttonTextColor.toLowerCase() !== '#ffffff' && theme.buttonTextColor.toLowerCase() !== '#fff') {
+      finalColor = theme.buttonTextColor;
+      finalBackground = theme.buttonTextColor;
+      finalBorder = theme.buttonTextColor;
+    } else {
+      finalColor = '#18181b';
+      finalBackground = '#18181b';
+      finalBorder = '#3b82f6';
+    }
   }
 
   return {
-    fill: hexToRgba(targetColor, 0.25, 'rgba(0, 0, 0, 0.2)'),
-    border: hexToRgba(targetColor, 0.55, 'rgba(0, 0, 0, 0.45)'),
+    color: finalColor,
+    background: finalBackground,
+    borderColor: finalBorder,
+    textColor: link?.textColor || theme.buttonTextColor || '#ffffff',
+    rippleFill: hexToRgba(finalColor, 0.28, 'rgba(37, 99, 235, 0.25)'),
+    rippleBorder: hexToRgba(finalBorder || finalColor, 0.65, 'rgba(37, 99, 235, 0.6)'),
   };
 };
 
@@ -235,6 +313,8 @@ interface LinkItemCardProps {
     clientX: number;
     clientY: number;
     color: string;
+    background?: string;
+    borderColor?: string;
     textColor?: string;
     url?: string;
   }) => void;
@@ -273,11 +353,7 @@ const LinkItemCard: React.FC<LinkItemCardProps> = ({
     const width = Math.max(maxRadius * 2.5, rect.width * 1.35);
     const height = Math.max(maxRadius * 1.6, rect.height * 2.2);
 
-    const colors = getThemeRippleColors(
-      theme,
-      linkBgColor,
-      linkTextColor
-    );
+    const themeColors = getAppliedThemeColors(theme, link);
 
     const id = Date.now() + Math.random();
     setRipples(prev => [...prev.slice(-1), {
@@ -286,8 +362,8 @@ const LinkItemCard: React.FC<LinkItemCardProps> = ({
       y,
       width,
       height,
-      fill: colors.fill,
-      border: colors.border,
+      fill: themeColors.rippleFill,
+      border: themeColors.rippleBorder,
     }]);
   };
 
@@ -311,24 +387,16 @@ const LinkItemCard: React.FC<LinkItemCardProps> = ({
     isNavigatingRef.current = true;
 
     const targetUrl = normalizedUrl;
-
-    // Determina a cor de preenchimento da expansão circular estilo PAINEL-DSS
-    let transitionColor = linkBgColor;
-    if (theme.buttonStyle === 'outline') {
-      transitionColor = link.buttonColor || theme.buttonColor || linkTextColor || '#2563eb';
-    } else if (theme.buttonStyle === 'glass') {
-      transitionColor = link.textColor || theme.profileTextColor || '#3b82f6';
-    }
-    if (!transitionColor || transitionColor === 'transparent') {
-      transitionColor = '#18181b';
-    }
+    const themeColors = getAppliedThemeColors(theme, link);
 
     if (onTriggerCircleTransition) {
       onTriggerCircleTransition({
         clientX,
         clientY,
-        color: transitionColor,
-        textColor: linkTextColor,
+        color: themeColors.color,
+        background: themeColors.background,
+        borderColor: themeColors.borderColor,
+        textColor: themeColors.textColor,
         url: targetUrl,
       });
       setTimeout(() => {
@@ -492,12 +560,16 @@ export const Preview: React.FC<PreviewProps> = ({
     clientX,
     clientY,
     color,
+    background,
+    borderColor,
     textColor,
     url,
   }: {
     clientX: number;
     clientY: number;
     color: string;
+    background?: string;
+    borderColor?: string;
     textColor?: string;
     url?: string;
   }) => {
@@ -516,6 +588,8 @@ export const Preview: React.FC<PreviewProps> = ({
       x: relativeX,
       y: relativeY,
       color,
+      background,
+      borderColor,
       textColor,
     });
   }, []);
@@ -719,6 +793,8 @@ export const Preview: React.FC<PreviewProps> = ({
       clientX,
       clientY,
       color: '#ee4d2d',
+      background: 'linear-gradient(135deg, #ee4d2d 0%, #ff6433 100%)',
+      borderColor: '#ff7a45',
       textColor: '#ffffff',
       url: ad.buttonUrl,
     });
