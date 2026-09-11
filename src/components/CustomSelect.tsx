@@ -54,7 +54,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="w-full flex items-center justify-between gap-3 bg-gray-900/60 hover:bg-gray-800 border border-gray-200/70 rounded-2xl px-4 py-3.5 text-sm text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all shadow-sm active:scale-[0.99]"
+        className="w-full flex items-center justify-between gap-3 bg-gray-900/60 hover:bg-gray-800 border border-gray-700/60 rounded-2xl px-4 py-3.5 text-sm text-white font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all shadow-sm active:scale-[0.99]"
       >
         <div className="flex items-center gap-3 truncate text-left">
           {selectedOption?.preview && (

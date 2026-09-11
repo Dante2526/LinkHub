@@ -111,15 +111,15 @@ export const ColorPicker = React.memo(function ColorPicker({
               width: '256px',
               maxWidth: 'calc(100vw - 24px)'
             }}
-            className="fixed z-[100] p-4 bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-150"
+            className="fixed z-[100] p-4 bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-150 text-white"
           >
             {/* Cabeçalho com botão fechar */}
-            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
-              <span className="text-xs font-bold text-gray-800">{title}</span>
+            <div className="flex items-center justify-between pb-2 border-b border-gray-700">
+              <span className="text-xs font-bold text-gray-200">{title}</span>
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="p-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                className="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
                 title="Fechar"
               >
                 <X className="w-4 h-4" />
@@ -137,8 +137,8 @@ export const ColorPicker = React.memo(function ColorPicker({
                 <button
                   key={preset}
                   type="button"
-                  className={`w-7 h-7 rounded-full border border-gray-200 shadow-xs hover:scale-110 active:scale-95 transition-transform ${
-                    color.toLowerCase() === preset.toLowerCase() ? 'ring-2 ring-blue-500 ring-offset-1' : ''
+                  className={`w-7 h-7 rounded-full border border-gray-600 shadow-xs hover:scale-110 active:scale-95 transition-transform ${
+                    color.toLowerCase() === preset.toLowerCase() ? 'ring-2 ring-blue-500 ring-offset-1 ring-offset-gray-800' : ''
                   }`}
                   style={{ backgroundColor: preset }}
                   onClick={() => onChange(preset)}
@@ -148,12 +148,12 @@ export const ColorPicker = React.memo(function ColorPicker({
             
             {/* Campo HEX */}
             <div className="flex items-center gap-2 pt-1">
-              <span className="text-xs font-bold text-gray-500 uppercase">HEX</span>
+              <span className="text-xs font-bold text-gray-400 uppercase">HEX</span>
               <input 
                 type="text" 
                 value={color}
                 onChange={(e) => onChange(e.target.value)}
-                className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-gray-900 uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white uppercase focus:outline-none focus:ring-2 focus:ring-blue-500/30"
               />
             </div>
           </div>

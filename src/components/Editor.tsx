@@ -397,28 +397,44 @@ export const Editor: React.FC<EditorProps> = ({
     <div className="w-full h-full flex flex-col">
       {/* Tabs */}
       <div className="px-6 pb-2">
-        <div className="flex bg-gray-200/60 p-1 rounded-full gap-1 overflow-x-auto no-scrollbar">
+        <div className="flex bg-gray-900/90 border border-gray-800 p-1.5 rounded-2xl gap-1.5 overflow-x-auto no-scrollbar shadow-inner">
           <button
             onClick={() => setActiveTab('links')}
-            className={`flex-1 py-2 px-1.5 rounded-full flex items-center justify-center gap-1 font-semibold text-xs whitespace-nowrap transition-all ${activeTab === 'links' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+            className={`flex-1 py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-xs whitespace-nowrap transition-all ${
+              activeTab === 'links' 
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
+                : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
+            }`}
           >
             Links
           </button>
           <button
             onClick={() => setActiveTab('profile')}
-            className={`flex-1 py-2 px-1.5 rounded-full flex items-center justify-center gap-1 font-semibold text-xs whitespace-nowrap transition-all ${activeTab === 'profile' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+            className={`flex-1 py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-xs whitespace-nowrap transition-all ${
+              activeTab === 'profile' 
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
+                : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
+            }`}
           >
             Perfil
           </button>
           <button
             onClick={() => setActiveTab('theme')}
-            className={`flex-1 py-2 px-1.5 rounded-full flex items-center justify-center gap-1 font-semibold text-xs whitespace-nowrap transition-all ${activeTab === 'theme' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+            className={`flex-1 py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-xs whitespace-nowrap transition-all ${
+              activeTab === 'theme' 
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
+                : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
+            }`}
           >
             Tema
           </button>
           <button
             onClick={() => setActiveTab('ad')}
-            className={`flex-1 py-2 px-1.5 rounded-full flex items-center justify-center gap-1 font-semibold text-xs whitespace-nowrap transition-all ${activeTab === 'ad' ? 'bg-gray-800 text-[#ee4d2d] shadow-sm' : 'text-gray-500 hover:text-white'}`}
+            className={`flex-1 py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-xs whitespace-nowrap transition-all ${
+              activeTab === 'ad' 
+                ? 'bg-[#ee4d2d] text-white shadow-md shadow-[#ee4d2d]/30' 
+                : 'text-gray-400 hover:text-[#ee4d2d] hover:bg-gray-800/60'
+            }`}
             title="Cartão de Anúncio / Shopee"
           >
             <ShoppingBag className="w-3.5 h-3.5 flex-shrink-0" />
@@ -426,7 +442,11 @@ export const Editor: React.FC<EditorProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('stats')}
-            className={`flex-1 py-2 px-1.5 rounded-full flex items-center justify-center gap-1 font-semibold text-xs whitespace-nowrap transition-all ${activeTab === 'stats' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+            className={`flex-1 py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-xs whitespace-nowrap transition-all ${
+              activeTab === 'stats' 
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
+                : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
+            }`}
           >
             Métricas
           </button>
@@ -1114,9 +1134,9 @@ export const Editor: React.FC<EditorProps> = ({
                     </div>
 
                     {/* Sliders X e Y */}
-                    <div className="space-y-3 bg-gray-50/80 p-3.5 rounded-2xl border border-gray-700/50">
+                    <div className="space-y-3 bg-gray-900/60 p-3.5 rounded-2xl border border-gray-700/50">
                       <div className="space-y-1.5">
-                        <div className="flex justify-between text-xs text-gray-500 font-medium">
+                        <div className="flex justify-between text-xs text-gray-400 font-medium">
                           <span>Posição Horizontal (X)</span>
                           <span className="font-mono font-bold text-white">{currentPos.x}%</span>
                         </div>
@@ -1126,12 +1146,12 @@ export const Editor: React.FC<EditorProps> = ({
                           max="100" 
                           value={currentPos.x}
                           onChange={(e) => updateBackgroundPosition({ ...currentPos, x: Number(e.target.value) })}
-                          className="w-full accent-blue-600 cursor-pointer h-2 bg-gray-200 rounded-lg appearance-none"
+                          className="w-full accent-blue-600 cursor-pointer h-2 bg-gray-700 rounded-lg appearance-none"
                         />
                       </div>
 
                       <div className="space-y-1.5">
-                        <div className="flex justify-between text-xs text-gray-500 font-medium">
+                        <div className="flex justify-between text-xs text-gray-400 font-medium">
                           <span>Posição Vertical (Y)</span>
                           <span className="font-mono font-bold text-white">{currentPos.y}%</span>
                         </div>
@@ -1141,7 +1161,7 @@ export const Editor: React.FC<EditorProps> = ({
                           max="100" 
                           value={currentPos.y}
                           onChange={(e) => updateBackgroundPosition({ ...currentPos, y: Number(e.target.value) })}
-                          className="w-full accent-blue-600 cursor-pointer h-2 bg-gray-200 rounded-lg appearance-none"
+                          className="w-full accent-blue-600 cursor-pointer h-2 bg-gray-700 rounded-lg appearance-none"
                         />
                       </div>
                     </div>
@@ -1408,7 +1428,7 @@ export const Editor: React.FC<EditorProps> = ({
                     onChange={(e) => updateAd('enabled', e.target.checked)} 
                     className="sr-only peer"
                   />
-                  <div className="w-12 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-800 after:border-gray-600 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#ee4d2d]"></div>
+                  <div className="w-12 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-600 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#ee4d2d]"></div>
                 </label>
               </div>
 
