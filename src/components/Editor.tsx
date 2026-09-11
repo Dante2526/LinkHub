@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AppData, LinkItem, Theme, Advertisement, defaultAd, BackgroundPosition } from '../types';
+import { AppData, LinkItem, Theme, Advertisement, defaultAd, BackgroundPosition, ThumbnailShape } from '../types';
 import { GripVertical, Plus, Trash2, Image as ImageIcon, Video, Palette, Link as LinkIcon, User, Camera, BarChart3, MousePointerClick, Clock, Calendar, Eye, Loader2, Upload, ShoppingBag, Megaphone, Sparkles, ExternalLink, Play, Tag, Timer, CheckCircle2, Move, Smartphone, Monitor } from 'lucide-react';
 import { ColorPicker } from './ColorPicker';
 import { CustomSelect, SelectOption } from './CustomSelect';
@@ -658,6 +658,57 @@ export const Editor: React.FC<EditorProps> = ({
                             <span>Direita</span>
                           </button>
                         </div>
+
+                        <div className="w-full pt-3">
+                          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-2 px-1 text-center">Formato da Imagem</label>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 bg-gray-900/60 p-1 rounded-2xl w-full max-w-[340px] mx-auto">
+                            <button 
+                              type="button"
+                              onClick={() => updateLink(link.id, 'thumbnailShape', 'round')}
+                              className={`py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${
+                                (!link.thumbnailShape ? (!data.theme.linkThumbnailShape || data.theme.linkThumbnailShape === 'round') : link.thumbnailShape === 'round')
+                                  ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' 
+                                  : 'text-gray-500 hover:text-white'
+                              }`}
+                            >
+                              Círculo
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => updateLink(link.id, 'thumbnailShape', 'rounded')}
+                              className={`py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${
+                                link.thumbnailShape === 'rounded' 
+                                  ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' 
+                                  : 'text-gray-500 hover:text-white'
+                              }`}
+                            >
+                              Arredondado
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => updateLink(link.id, 'thumbnailShape', 'square')}
+                              className={`py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${
+                                link.thumbnailShape === 'square' 
+                                  ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' 
+                                  : 'text-gray-500 hover:text-white'
+                              }`}
+                            >
+                              Quadrado
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => updateLink(link.id, 'thumbnailShape', 'match-card')}
+                              className={`py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${
+                                (link.thumbnailShape === 'match-card' || (!link.thumbnailShape && data.theme.linkThumbnailShape === 'match-card'))
+                                  ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' 
+                                  : 'text-gray-500 hover:text-white'
+                              }`}
+                              title="Formato acompanha o formato do cartão de link"
+                            >
+                              Do Cartão
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     )}
                     <div className="pt-2 flex flex-col items-center">
@@ -1208,6 +1259,29 @@ export const Editor: React.FC<EditorProps> = ({
                       onClick={() => updateTheme('linkThumbnailPosition', 'right')}
                       className={`flex-1 py-2 px-3 text-sm rounded-xl font-semibold transition-all ${data.theme.linkThumbnailPosition === 'right' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
                     >Lado Direito</button>
+                  </div>
+                </div>
+
+                <div className="pt-2 space-y-2">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block text-center">Formato da Imagem nos Links</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-gray-900/60 p-1 rounded-2xl">
+                    <button 
+                      onClick={() => updateTheme('linkThumbnailShape', 'round')}
+                      className={`py-2 px-1 text-xs sm:text-sm rounded-xl font-semibold transition-all ${(!data.theme.linkThumbnailShape || data.theme.linkThumbnailShape === 'round') ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                    >Círculo</button>
+                    <button 
+                      onClick={() => updateTheme('linkThumbnailShape', 'rounded')}
+                      className={`py-2 px-1 text-xs sm:text-sm rounded-xl font-semibold transition-all ${data.theme.linkThumbnailShape === 'rounded' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                    >Arredondado</button>
+                    <button 
+                      onClick={() => updateTheme('linkThumbnailShape', 'square')}
+                      className={`py-2 px-1 text-xs sm:text-sm rounded-xl font-semibold transition-all ${data.theme.linkThumbnailShape === 'square' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                    >Quadrado</button>
+                    <button 
+                      onClick={() => updateTheme('linkThumbnailShape', 'match-card')}
+                      className={`py-2 px-1 text-xs sm:text-sm rounded-xl font-semibold transition-all ${data.theme.linkThumbnailShape === 'match-card' ? 'bg-gray-700 text-blue-400 shadow-md border border-gray-600' : 'text-gray-500 hover:text-white'}`}
+                      title="Combina perfeitamente com o formato e bordas do cartão de link"
+                    >Igual ao Cartão</button>
                   </div>
                 </div>
               </div>

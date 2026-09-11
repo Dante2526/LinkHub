@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AppData, Theme, BackgroundPosition } from '../types';
+import { AppData, Theme, BackgroundPosition, ThumbnailShape, ButtonRadius } from '../types';
 import { Share2, X, ShoppingBag, ExternalLink, Clock, ShieldCheck, Sparkles, Move, Check, RotateCcw, Truck, Flame, Tag } from 'lucide-react';
 import { db, isFirebaseConfigured } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
@@ -117,6 +117,31 @@ const getAnimationVariants = (animation?: string) => {
         hidden: { opacity: 0, y: 20 },
         visible: baseVisible
       };
+  }
+};
+
+const getThumbnailShapeClass = (shape?: ThumbnailShape, buttonRadius?: ButtonRadius): string => {
+  const effectiveShape = shape || 'round';
+
+  if (effectiveShape === 'match-card') {
+    switch (buttonRadius) {
+      case 'none': return 'rounded-none';
+      case 'sm': return 'rounded-sm';
+      case 'md': return 'rounded-lg';
+      case 'lg': return 'rounded-xl';
+      case 'xl': return 'rounded-2xl';
+      case 'full': return 'rounded-full';
+      case 'leaf': return 'rounded-tl-2xl rounded-br-2xl rounded-tr-xs rounded-bl-xs';
+      default: return 'rounded-full';
+    }
+  }
+
+  switch (effectiveShape) {
+    case 'square': return 'rounded-none';
+    case 'rounded': return 'rounded-xl';
+    case 'round': 
+    default:
+      return 'rounded-full';
   }
 };
 
@@ -542,6 +567,8 @@ export const Preview: React.FC<PreviewProps> = ({
             const linkBgColor = link.buttonColor || theme.buttonColor || '#ffffff';
             const thumbPos = link.thumbnailPosition || theme.linkThumbnailPosition || 'left';
             const isRight = thumbPos === 'right';
+            const thumbShape = link.thumbnailShape || theme.linkThumbnailShape || 'round';
+            const thumbShapeClass = getThumbnailShapeClass(thumbShape, theme.buttonRadius);
             const normalizedUrl = link.url?.trim() 
               ? (/^(https?:\/\/|mailto:|tel:)/i.test(link.url.trim()) ? link.url.trim() : `https://${link.url.trim()}`) 
               : '#';
@@ -585,7 +612,7 @@ export const Preview: React.FC<PreviewProps> = ({
                         alt="" 
                         loading="lazy" 
                         decoding="async" 
-                        className={`absolute ${isRight ? 'right-2.5' : 'left-2.5'} top-1/2 -translate-y-1/2 w-8 h-8 rounded-full object-cover flex-shrink-0`} 
+                        className={`absolute ${isRight ? 'right-2.5' : 'left-2.5'} top-1/2 -translate-y-1/2 w-8 h-8 ${thumbShapeClass} object-cover flex-shrink-0`} 
                       />
                     )}
                     <div className={`w-full ${link.thumbnailUrl ? 'px-9' : 'px-2'} flex flex-col items-center justify-center text-center`}>
@@ -617,7 +644,7 @@ export const Preview: React.FC<PreviewProps> = ({
                   // Formato Classic (Padrão) - Centralizado
                   <div className="relative w-full flex items-center justify-center min-h-[58px] py-3.5 px-4 text-center">
                     {link.thumbnailUrl && (
-                      <div className={`absolute ${isRight ? 'right-3.5' : 'left-3.5'} top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-full overflow-hidden flex-shrink-0`}>
+                      <div className={`absolute ${isRight ? 'right-3.5' : 'left-3.5'} top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center ${thumbShapeClass} overflow-hidden flex-shrink-0`}>
                         <img src={link.thumbnailUrl} alt="" className="w-full h-full object-cover" />
                       </div>
                     )}

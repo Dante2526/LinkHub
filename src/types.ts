@@ -3,6 +3,7 @@ export type ButtonStyle = 'solid' | 'outline' | 'glass';
 export type ButtonRadius = 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'leaf';
 export type LinkFormat = 'classic' | 'featured' | 'compact' | 'minimal' | 'banner';
 export type AvatarShape = 'round' | 'rounded' | 'square';
+export type ThumbnailShape = 'round' | 'rounded' | 'square' | 'match-card';
 export type LinkAnimation = 'none' | 'pulse' | 'bounce' | 'shake' | 'glow';
 
 export interface BackgroundPosition {
@@ -29,6 +30,7 @@ export interface Theme {
   profileTextColor?: string;
   linkTextAlign?: 'center' | 'left';
   linkThumbnailPosition?: 'left' | 'right';
+  linkThumbnailShape?: ThumbnailShape;
 }
 
 export interface LinkItem {
@@ -38,6 +40,7 @@ export interface LinkItem {
   url: string;
   thumbnailUrl: string;
   thumbnailPosition?: 'left' | 'right';
+  thumbnailShape?: ThumbnailShape;
   isVisible: boolean;
   animation?: LinkAnimation;
   textColor?: string;
@@ -105,6 +108,7 @@ export const defaultTheme: Theme = {
   profileTextColor: '#ffffff',
   linkTextAlign: 'center',
   linkThumbnailPosition: 'left',
+  linkThumbnailShape: 'round',
 };
 
 export const defaultProfile: Profile = {
