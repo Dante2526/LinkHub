@@ -221,8 +221,8 @@ const getThemeRippleColors = (
   }
 
   return {
-    fill: hexToRgba(targetColor, 0.2, 'rgba(0, 0, 0, 0.15)'),
-    border: hexToRgba(targetColor, 0.4, 'rgba(0, 0, 0, 0.3)'),
+    fill: hexToRgba(targetColor, 0.25, 'rgba(0, 0, 0, 0.2)'),
+    border: hexToRgba(targetColor, 0.55, 'rgba(0, 0, 0, 0.45)'),
   };
 };
 
@@ -234,6 +234,7 @@ interface LinkItemCardProps {
 
 const LinkItemCard: React.FC<LinkItemCardProps> = ({ link, theme, onLinkClick }) => {
   const [ripples, setRipples] = useState<EllipseRipple[]>([]);
+  const isNavigatingRef = useRef(false);
   const format = theme.linkFormat || 'classic';
   const linkTextColor = link.textColor || theme.buttonTextColor || '#000000';
   const linkBgColor = link.buttonColor || theme.buttonColor || '#ffffff';
@@ -245,17 +246,18 @@ const LinkItemCard: React.FC<LinkItemCardProps> = ({ link, theme, onLinkClick })
     ? (/^(https?:\/\/|mailto:|tel:)/i.test(link.url.trim()) ? link.url.trim() : `https://${link.url.trim()}`) 
     : '#';
 
-  const triggerRipple = (clientX: number, clientY: number, rect: DOMRect) => {
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
+  const triggerRipple = (clientX: number, clientY: number, target: HTMLElement) => {
+    const rect = target.getBoundingClientRect();
+    const x = clientX ? clientX - rect.left : rect.width / 2;
+    const y = clientY ? clientY - rect.top : rect.height / 2;
 
     // Distância máxima do ponto do clique até o canto mais distante do botão
     const distX = Math.max(x, rect.width - x);
     const distY = Math.max(y, rect.height - y);
     const maxRadius = Math.hypot(distX, distY);
 
-    // Geometria em elipse: cobrindo amplamente o formato horizontal do botão
-    const width = Math.max(maxRadius * 2.8, rect.width * 1.4);
+    // Geometria em elipse calculada para o tamanho real do botão
+    const width = Math.max(maxRadius * 2.5, rect.width * 1.35);
     const height = Math.max(maxRadius * 1.6, rect.height * 2.2);
 
     const colors = getThemeRippleColors(
@@ -265,7 +267,7 @@ const LinkItemCard: React.FC<LinkItemCardProps> = ({ link, theme, onLinkClick })
     );
 
     const id = Date.now() + Math.random();
-    setRipples(prev => [...prev.slice(-2), {
+    setRipples(prev => [...prev.slice(-1), {
       id,
       x,
       y,
@@ -277,17 +279,36 @@ const LinkItemCard: React.FC<LinkItemCardProps> = ({ link, theme, onLinkClick })
   };
 
   const handlePointerDown = (e: React.PointerEvent<HTMLAnchorElement>) => {
-    if (e.button !== 0) return; // apenas clique principal / toque
-    triggerRipple(e.clientX, e.clientY, e.currentTarget.getBoundingClientRect());
+    if (e.button !== 0) return;
+    triggerRipple(e.clientX, e.clientY, e.currentTarget);
   };
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    // Se ativado via teclado (acessibilidade)
-    if (e.clientX === 0 && e.clientY === 0) {
-      const rect = e.currentTarget.getBoundingClientRect();
-      triggerRipple(rect.left + rect.width / 2, rect.top + rect.height / 2, rect);
-    }
+    e.preventDefault();
+
+    // Dispara a onda caso não tenha sido disparada pelo pointerdown
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clientX = e.clientX || (rect.left + rect.width / 2);
+    const clientY = e.clientY || (rect.top + rect.height / 2);
+    triggerRipple(clientX, clientY, e.currentTarget);
+
     onLinkClick?.(link.id);
+
+    if (isNavigatingRef.current) return;
+    isNavigatingRef.current = true;
+
+    const targetUrl = normalizedUrl;
+    // Aguarda a animação da elipse se expandir por completo antes de abrir o link
+    setTimeout(() => {
+      isNavigatingRef.current = false;
+      if (targetUrl && targetUrl !== '#') {
+        if (targetUrl.startsWith('mailto:') || targetUrl.startsWith('tel:')) {
+          window.location.href = targetUrl;
+        } else {
+          window.open(targetUrl, '_blank', 'noopener,noreferrer');
+        }
+      }
+    }, 450);
   };
 
   return (
@@ -295,8 +316,7 @@ const LinkItemCard: React.FC<LinkItemCardProps> = ({ link, theme, onLinkClick })
       onPointerDown={handlePointerDown}
       onClick={handleClick}
       variants={getAnimationVariants(link.animation)}
-      whileHover={{ scale: 1.02, y: -2 }}
-      whileTap={{ scale: 0.995 }}
+      whileHover={{ scale: 1.015, y: -1 }}
       href={normalizedUrl} 
       target="_blank" 
       rel="noopener noreferrer"
@@ -309,43 +329,40 @@ const LinkItemCard: React.FC<LinkItemCardProps> = ({ link, theme, onLinkClick })
             : { color: linkTextColor }
       }
     >
-      {/* Dynamic Wavefront: inicia circular no ponto do clique e se expande em elipse luminosa */}
+      {/* Dynamic Wavefront: surge circular exatamente no ponto do clique e desabrocha em elipse */}
       <AnimatePresence>
         {ripples.map(ripple => (
           <motion.span
             key={ripple.id}
             initial={{
-              x: '-50%',
-              y: '-50%',
               scaleX: 0,
               scaleY: 0,
-              opacity: 0.95,
+              opacity: 0.9,
             }}
             animate={{
-              x: '-50%',
-              y: '-50%',
               scaleX: [0, 0.45, 1],
               scaleY: [0, 0.65, 1],
-              opacity: [0.95, 0.8, 0],
+              opacity: [0.9, 0.75, 0],
             }}
             exit={{ opacity: 0 }}
             transition={{
-              duration: 0.75,
+              duration: 0.55,
               times: [0, 0.35, 1],
-              ease: [0.16, 1, 0.3, 1],
+              ease: [0.22, 1, 0.36, 1],
             }}
             onAnimationComplete={() => {
               setRipples(prev => prev.filter(r => r.id !== ripple.id));
             }}
-            className="absolute pointer-events-none z-30 will-change-transform"
+            className="absolute pointer-events-none z-30"
             style={{
-              left: ripple.x,
-              top: ripple.y,
+              left: ripple.x - ripple.width / 2,
+              top: ripple.y - ripple.height / 2,
               width: ripple.width,
               height: ripple.height,
               borderRadius: '50%',
-              background: `radial-gradient(ellipse at center, ${ripple.fill} 0%, ${ripple.fill} 50%, transparent 85%)`,
-              border: `1.5px solid ${ripple.border}`,
+              backgroundColor: ripple.fill,
+              border: `2px solid ${ripple.border}`,
+              transformOrigin: 'center center',
             }}
           />
         ))}
@@ -562,6 +579,7 @@ export const Preview: React.FC<PreviewProps> = ({
   }, [isAdOpen, adCountdown]);
 
   const [adRipples, setAdRipples] = useState<EllipseRipple[]>([]);
+  const isAdOpeningRef = useRef(false);
 
   const handleCloseAd = () => {
     if (adCountdown > 0) return;
@@ -571,18 +589,18 @@ export const Preview: React.FC<PreviewProps> = ({
 
   const triggerAdRipple = (clientX: number, clientY: number, target: HTMLElement) => {
     const rect = target.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
+    const x = clientX ? clientX - rect.left : rect.width / 2;
+    const y = clientY ? clientY - rect.top : rect.height / 2;
     const maxRadius = Math.hypot(Math.max(x, rect.width - x), Math.max(y, rect.height - y));
     const id = Date.now() + Math.random();
-    setAdRipples(prev => [...prev.slice(-2), {
+    setAdRipples(prev => [...prev.slice(-1), {
       id,
       x,
       y,
-      width: Math.max(maxRadius * 2.8, rect.width * 1.4),
+      width: Math.max(maxRadius * 2.5, rect.width * 1.35),
       height: Math.max(maxRadius * 1.6, rect.height * 2.2),
-      fill: 'rgba(255, 255, 255, 0.22)',
-      border: 'rgba(255, 255, 255, 0.45)',
+      fill: 'rgba(255, 255, 255, 0.28)',
+      border: 'rgba(255, 255, 255, 0.65)',
     }]);
   };
 
@@ -592,13 +610,22 @@ export const Preview: React.FC<PreviewProps> = ({
   };
 
   const handleAdCtaClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (e.clientX === 0 && e.clientY === 0) {
-      const rect = e.currentTarget.getBoundingClientRect();
-      triggerAdRipple(rect.left + rect.width / 2, rect.top + rect.height / 2, e.currentTarget);
-    }
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clientX = e.clientX || (rect.left + rect.width / 2);
+    const clientY = e.clientY || (rect.top + rect.height / 2);
+    triggerAdRipple(clientX, clientY, e.currentTarget);
+
+    if (isAdOpeningRef.current) return;
+    isAdOpeningRef.current = true;
+
     localStorage.setItem('linkhub_last_ad_seen', Date.now().toString());
     setTimeout(() => {
+      isAdOpeningRef.current = false;
       setIsAdOpen(false);
+      if (ad.buttonUrl) {
+        window.open(ad.buttonUrl, '_blank', 'noopener,noreferrer');
+      }
     }, 450);
   };
 
@@ -1025,37 +1052,34 @@ export const Preview: React.FC<PreviewProps> = ({
                       <motion.span
                         key={ripple.id}
                         initial={{
-                          x: '-50%',
-                          y: '-50%',
                           scaleX: 0,
                           scaleY: 0,
-                          opacity: 0.95,
+                          opacity: 0.9,
                         }}
                         animate={{
-                          x: '-50%',
-                          y: '-50%',
                           scaleX: [0, 0.45, 1],
                           scaleY: [0, 0.65, 1],
-                          opacity: [0.95, 0.8, 0],
+                          opacity: [0.9, 0.75, 0],
                         }}
                         exit={{ opacity: 0 }}
                         transition={{
-                          duration: 0.75,
+                          duration: 0.55,
                           times: [0, 0.35, 1],
-                          ease: [0.16, 1, 0.3, 1],
+                          ease: [0.22, 1, 0.36, 1],
                         }}
                         onAnimationComplete={() => {
                           setAdRipples(prev => prev.filter(r => r.id !== ripple.id));
                         }}
-                        className="absolute pointer-events-none z-30 will-change-transform"
+                        className="absolute pointer-events-none z-30"
                         style={{
-                          left: ripple.x,
-                          top: ripple.y,
+                          left: ripple.x - ripple.width / 2,
+                          top: ripple.y - ripple.height / 2,
                           width: ripple.width,
                           height: ripple.height,
                           borderRadius: '50%',
-                          background: `radial-gradient(ellipse at center, ${ripple.fill} 0%, ${ripple.fill} 50%, transparent 85%)`,
-                          border: `1.5px solid ${ripple.border}`,
+                          backgroundColor: ripple.fill,
+                          border: `2px solid ${ripple.border}`,
+                          transformOrigin: 'center center',
                         }}
                       />
                     ))}
