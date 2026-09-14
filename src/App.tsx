@@ -24,23 +24,22 @@ const CACHE_KEY = 'linkhub_cached_profile';
 
 const getInitialData = (): AppData | null => {
   try {
-    let raw = localStorage.getItem(CACHE_KEY);
+    // 1. Limpeza proativa de chaves legadas e resíduos no navegador
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem('linkhub_profile_version');
+    } catch (e) {}
 
-    if (!raw) {
-      const legacy = localStorage.getItem(STORAGE_KEY);
-      if (legacy) {
-        raw = legacy;
-        try {
-          localStorage.setItem(CACHE_KEY, legacy);
-        } catch (e) {}
-      }
-    }
+    let raw = localStorage.getItem(CACHE_KEY);
 
     if (raw) {
       const parsed = JSON.parse(raw);
 
       if (!Array.isArray(parsed.links)) {
         parsed.links = [];
+      } else {
+        // Blindagem: descarta quaisquer links de exemplo do template antigo que possam estar em cache local
+        parsed.links = parsed.links.filter((l: any) => l.title !== 'Meu Canal no YouTube');
       }
 
       if (parsed?.theme) {
@@ -284,11 +283,45 @@ function PublicView({ data, onLinkClick, onView }: { data: AppData, onLinkClick:
     onView();
   }, [onView]);
 
+  // Blindagem de segurança do visitante: bloqueia F12, atalhos de inspeção e botão direito
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Bloqueia F12
+      if (e.key === 'F12' || e.keyCode === 123) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+      // Bloqueia Ctrl+Shift+I / J / C (DevTools)
+      if (e.ctrlKey && e.shiftKey && ['I', 'i', 'J', 'j', 'C', 'c'].includes(e.key)) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+      // Bloqueia Ctrl+U (Ver código-fonte)
+      if (e.ctrlKey && (e.key === 'u' || e.key === 'U')) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    };
+
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    window.addEventListener('contextmenu', handleContextMenu, { capture: true });
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, { capture: true });
+      window.removeEventListener('contextmenu', handleContextMenu, { capture: true });
+    };
+  }, []);
+
   return (
-    <div className="w-full h-[100dvh] relative">
+    <div className="w-full h-[100dvh] relative select-none">
       <MemoizedPreview data={data} onLinkClick={onLinkClick} />
-      
-      
     </div>
   );
 }

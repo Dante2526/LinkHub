@@ -597,6 +597,11 @@ export const Preview: React.FC<PreviewProps> = ({
   const handleCircleReadyToNavigate = useCallback(() => {
     const targetUrl = pendingNavigationUrlRef.current;
     if (targetUrl && targetUrl !== '#') {
+      const lower = targetUrl.trim().toLowerCase();
+      if (lower.startsWith('javascript:') || lower.startsWith('data:') || lower.startsWith('vbscript:')) {
+        console.warn('URL bloqueada por segurança:', targetUrl);
+        return;
+      }
       if (targetUrl.startsWith('mailto:') || targetUrl.startsWith('tel:')) {
         window.location.href = targetUrl;
       } else {
