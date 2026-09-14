@@ -1,8 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
-import { doc, onSnapshot, setDoc, collection, addDoc } from 'firebase/firestore';
+import { 
+  doc, 
+  onSnapshot, 
+  setDoc, 
+  collection, 
+  addDoc, 
+  deleteDoc, 
+  getDoc, 
+  writeBatch 
+} from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './lib/firebase';
-import { AppData, defaultTheme, defaultProfile, defaultLinks, defaultAd, BackgroundPosition } from './types';
+import { AppData, defaultTheme, defaultProfile, defaultLinks, defaultAd, BackgroundPosition, LinkItem, Theme, Profile, Advertisement } from './types';
 import { Preview } from './components/Preview';
 import { Smartphone, Monitor, ExternalLink, Loader2, LogOut } from 'lucide-react';
 import { checkIsAdminAuthorized } from './components/Login';
@@ -17,7 +26,6 @@ const getInitialData = (): AppData | null => {
   try {
     let raw = localStorage.getItem(CACHE_KEY);
 
-    // 1. Ponte de resgate automático: Se o cache novo estiver vazio, busca na chave legada
     if (!raw) {
       const legacy = localStorage.getItem(STORAGE_KEY);
       if (legacy) {
@@ -31,18 +39,8 @@ const getInitialData = (): AppData | null => {
     if (raw) {
       const parsed = JSON.parse(raw);
 
-      // 2. Se o cache atual tiver apenas links padrão/vazios, mas a chave legada tiver links reais, restaura os links
-      const legacyRaw = localStorage.getItem(STORAGE_KEY);
-      if (legacyRaw && (!parsed.links || parsed.links.length === 0 || (parsed.links.length <= 2 && parsed.links[0]?.title === 'Meu Canal no YouTube'))) {
-        try {
-          const legacyParsed = JSON.parse(legacyRaw);
-          if (Array.isArray(legacyParsed.links) && legacyParsed.links.length > 0 && legacyParsed.links[0]?.title !== 'Meu Canal no YouTube') {
-            parsed.links = legacyParsed.links;
-            if (legacyParsed.profile) parsed.profile = legacyParsed.profile;
-            if (legacyParsed.theme) parsed.theme = legacyParsed.theme;
-            localStorage.setItem(CACHE_KEY, JSON.stringify(parsed));
-          }
-        } catch (e) {}
+      if (!Array.isArray(parsed.links)) {
+        parsed.links = [];
       }
 
       if (parsed?.theme) {
@@ -299,129 +297,221 @@ export default function App() {
   const [data, setData] = useState<AppData | null>(getInitialData);
   const [loading, setLoading] = useState<boolean>(() => !getInitialData());
   const [adminEmail, setAdminEmail] = useState<string | null>(localStorage.getItem('linkhub_admin_email'));
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const profileTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const themeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const adTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const linksTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     document.title = 'LinkHub';
     return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
+      if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current);
+      if (themeTimeoutRef.current) clearTimeout(themeTimeoutRef.current);
+      if (adTimeoutRef.current) clearTimeout(adTimeoutRef.current);
+      if (linksTimeoutRef.current) clearTimeout(linksTimeoutRef.current);
     };
   }, []);
 
   useEffect(() => {
     if (!isFirebaseConfigured) {
       if (!data) {
-        const defaultData = getInitialData() || { profile: defaultProfile, theme: defaultTheme, links: defaultLinks };
+        const defaultData = getInitialData() || { profile: defaultProfile, theme: defaultTheme, links: [], ad: defaultAd };
         setData(defaultData);
       }
       setLoading(false);
       return;
     }
 
-    try {
-      const docRef = doc(db, 'perfis', 'principal');
-      const unsubscribe = onSnapshot(docRef, (snapshot) => {
-        if (snapshot.exists()) {
-          const fetchedData = snapshot.data() as AppData;
-          if (!fetchedData.theme) {
-            fetchedData.theme = { ...defaultTheme };
-          }
-          if (!fetchedData.theme.profileTextColor) {
-            fetchedData.theme.profileTextColor = '#ffffff';
-          }
-          if (!fetchedData.theme.linkTextAlign) {
-            fetchedData.theme.linkTextAlign = 'center';
-          }
-          if (!fetchedData.theme.backgroundPositionMobile) {
-            fetchedData.theme.backgroundPositionMobile = { x: 50, y: 50 };
-          }
-          if (!fetchedData.theme.backgroundPositionDesktop) {
-            fetchedData.theme.backgroundPositionDesktop = { x: 50, y: 50 };
-          }
-          if (fetchedData.theme.backgroundGradient && fetchedData.theme.backgroundGradient.includes('#ff9a9e')) {
-            fetchedData.theme.backgroundGradient = 'linear-gradient(135deg, #18181b 0%, #09090b 100%)';
-          }
-          if (!fetchedData.ad) {
-            fetchedData.ad = { ...defaultAd };
-          } else {
-            fetchedData.ad = { ...defaultAd, ...fetchedData.ad };
-          }
-          const serverVersion = fetchedData.updatedAt || 0;
-          const cachedVersion = Number(localStorage.getItem('linkhub_profile_version') || 0);
-
-          if (serverVersion && serverVersion > cachedVersion) {
-            try {
-              localStorage.setItem('linkhub_profile_version', String(serverVersion));
-            } catch (e) {}
-          }
-
-          // Ponte de preservação/recuperação: se houver links no cache local legado que não estão no servidor, mescla-os com segurança
-          const legacyRaw = localStorage.getItem(STORAGE_KEY);
-          if (legacyRaw) {
-            try {
-              const legacyParsed = JSON.parse(legacyRaw);
-              if (Array.isArray(legacyParsed.links) && legacyParsed.links.length > 0) {
-                const currentUrls = new Set((fetchedData.links || []).map((l: any) => l.url));
-                const currentTitles = new Set((fetchedData.links || []).map((l: any) => l.title));
-                const recoveredLinks = legacyParsed.links.filter((l: any) => 
-                  !currentUrls.has(l.url) && !currentTitles.has(l.title) && l.title !== 'Meu Canal no YouTube'
-                );
-                if (recoveredLinks.length > 0) {
-                  fetchedData.links = [...(fetchedData.links || []), ...recoveredLinks];
-                  fetchedData.updatedAt = Date.now();
-                  setDoc(docRef, fetchedData).catch(console.error);
-                }
-              }
-            } catch (e) {}
-          }
-
-          setData(prev => {
-            // Evita re-render desnecessário se os dados locais já forem idênticos aos do Firestore
-            if (prev && JSON.stringify(prev) === JSON.stringify(fetchedData)) {
-              return prev;
-            }
-            return fetchedData;
-          });
-          try {
-            localStorage.setItem(CACHE_KEY, JSON.stringify(fetchedData));
-            if (serverVersion) {
-              localStorage.setItem('linkhub_profile_version', String(serverVersion));
-            }
-          } catch (e) {
-            console.error("Erro ao salvar cache", e);
-          }
-        } else {
-          // Documento não existe no Firestore: NUNCA force defaultData se já houver dados no cache local!
-          const localFallback = getInitialData();
-          const initialDataToSave: AppData = (localFallback && localFallback.links && localFallback.links.length > 0)
-            ? { ...localFallback, updatedAt: Date.now() }
-            : { profile: defaultProfile, theme: defaultTheme, links: defaultLinks, ad: defaultAd, updatedAt: Date.now() };
-
-          setDoc(docRef, initialDataToSave).catch(console.error);
-          setData(initialDataToSave);
-          try {
-            localStorage.setItem(CACHE_KEY, JSON.stringify(initialDataToSave));
-            localStorage.setItem('linkhub_profile_version', String(initialDataToSave.updatedAt || Date.now()));
-          } catch (e) {}
-        }
+    const loaded = { profile: false, theme: false, links: false, ad: false };
+    const checkAllLoaded = () => {
+      if (loaded.profile && loaded.theme && loaded.links && loaded.ad) {
         setLoading(false);
-      }, (error) => {
-        console.error("Erro no onSnapshot do Firestore:", error);
-        if (!data) {
-          setData(getInitialData() || { profile: defaultProfile, theme: defaultTheme, links: defaultLinks });
-        }
-        setLoading(false);
-      });
-      return () => unsubscribe();
-    } catch (err) {
-      console.error("Erro ao conectar no Firestore:", err);
-      if (!data) {
-        setData(getInitialData() || { profile: defaultProfile, theme: defaultTheme, links: defaultLinks });
       }
+    };
+
+    // Timeout de segurança absoluto: no máximo 2s de tela de loading
+    const safetyTimer = setTimeout(() => {
       setLoading(false);
-    }
+    }, 2000);
+
+    // 1. Migração automática: se perfis/principal ainda existir, migra para as 4 coleções e exclui o antigo
+    const runMigrationIfNeeded = async () => {
+      try {
+        const legacyDocRef = doc(db, 'perfis', 'principal');
+        const legacySnap = await getDoc(legacyDocRef);
+        if (legacySnap.exists()) {
+          const legacyData = legacySnap.data() as AppData;
+          console.log('[Migração LinkHub] Migrando documento antigo perfis/principal para arquitetura modular...');
+
+          if (legacyData.profile) {
+            await setDoc(doc(db, 'perfil', 'principal'), {
+              ...legacyData.profile,
+              updatedAt: Date.now()
+            }, { merge: true });
+          }
+
+          if (legacyData.theme) {
+            await setDoc(doc(db, 'temas', 'principal'), {
+              ...legacyData.theme,
+              updatedAt: Date.now()
+            }, { merge: true });
+          }
+
+          if (legacyData.ad) {
+            await setDoc(doc(db, 'anuncios', 'principal'), {
+              ...legacyData.ad,
+              updatedAt: Date.now()
+            }, { merge: true });
+          }
+
+          if (Array.isArray(legacyData.links) && legacyData.links.length > 0) {
+            const realLinks = legacyData.links.filter(l => l.title !== 'Meu Canal no YouTube');
+            if (realLinks.length > 0) {
+              const batch = writeBatch(db);
+              realLinks.forEach((link, idx) => {
+                if (link.id) {
+                  batch.set(doc(db, 'links', link.id), {
+                    ...link,
+                    order: idx,
+                    updatedAt: Date.now()
+                  });
+                }
+              });
+              await batch.commit();
+            }
+          }
+
+          await deleteDoc(legacyDocRef);
+          console.log('[Migração LinkHub] Documento legado perfis/principal excluído com sucesso!');
+        }
+      } catch (err) {
+        console.error('[Migração LinkHub] Erro na migração de dados legados:', err);
+      }
+    };
+
+    runMigrationIfNeeded();
+
+    // 2. Escuta Perfil (perfil/principal)
+    const unsubProfile = onSnapshot(doc(db, 'perfil', 'principal'), (snap) => {
+      let profile: Profile;
+      if (snap.exists()) {
+        profile = snap.data() as Profile;
+      } else {
+        const local = getInitialData()?.profile;
+        profile = local || defaultProfile;
+        setDoc(doc(db, 'perfil', 'principal'), { ...profile, updatedAt: Date.now() }).catch(console.error);
+      }
+      setData(prev => ({
+        profile,
+        theme: prev?.theme || getInitialData()?.theme || defaultTheme,
+        links: prev?.links || getInitialData()?.links || [],
+        ad: prev?.ad || getInitialData()?.ad || defaultAd,
+        updatedAt: Date.now()
+      }));
+      loaded.profile = true;
+      checkAllLoaded();
+    }, (err) => {
+      console.error('Erro ao ler perfil:', err);
+      loaded.profile = true;
+      checkAllLoaded();
+    });
+
+    // 3. Escuta Tema (temas/principal)
+    const unsubTheme = onSnapshot(doc(db, 'temas', 'principal'), (snap) => {
+      let theme: Theme;
+      if (snap.exists()) {
+        const raw = snap.data() as Theme;
+        theme = { ...defaultTheme, ...raw };
+        if (!theme.profileTextColor) theme.profileTextColor = '#ffffff';
+        if (!theme.linkTextAlign) theme.linkTextAlign = 'center';
+        if (!theme.backgroundPositionMobile) theme.backgroundPositionMobile = { x: 50, y: 50 };
+        if (!theme.backgroundPositionDesktop) theme.backgroundPositionDesktop = { x: 50, y: 50 };
+      } else {
+        const local = getInitialData()?.theme;
+        theme = local || defaultTheme;
+        setDoc(doc(db, 'temas', 'principal'), { ...theme, updatedAt: Date.now() }).catch(console.error);
+      }
+      setData(prev => ({
+        profile: prev?.profile || getInitialData()?.profile || defaultProfile,
+        theme,
+        links: prev?.links || getInitialData()?.links || [],
+        ad: prev?.ad || getInitialData()?.ad || defaultAd,
+        updatedAt: Date.now()
+      }));
+      loaded.theme = true;
+      checkAllLoaded();
+    }, (err) => {
+      console.error('Erro ao ler tema:', err);
+      loaded.theme = true;
+      checkAllLoaded();
+    });
+
+    // 4. Escuta Anúncios (anuncios/principal)
+    const unsubAd = onSnapshot(doc(db, 'anuncios', 'principal'), (snap) => {
+      let ad: Advertisement;
+      if (snap.exists()) {
+        ad = { ...defaultAd, ...snap.data() as Advertisement };
+      } else {
+        const local = getInitialData()?.ad;
+        ad = local || defaultAd;
+        setDoc(doc(db, 'anuncios', 'principal'), { ...ad, updatedAt: Date.now() }).catch(console.error);
+      }
+      setData(prev => ({
+        profile: prev?.profile || getInitialData()?.profile || defaultProfile,
+        theme: prev?.theme || getInitialData()?.theme || defaultTheme,
+        links: prev?.links || getInitialData()?.links || [],
+        ad,
+        updatedAt: Date.now()
+      }));
+      loaded.ad = true;
+      checkAllLoaded();
+    }, (err) => {
+      console.error('Erro ao ler anúncios:', err);
+      loaded.ad = true;
+      checkAllLoaded();
+    });
+
+    // 5. Escuta Coleção Links (/links)
+    const unsubLinks = onSnapshot(collection(db, 'links'), (snap) => {
+      const items: (LinkItem & { order?: number })[] = [];
+      snap.forEach(d => {
+        items.push({ ...d.data(), id: d.id } as LinkItem & { order?: number });
+      });
+      items.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      const finalLinks: LinkItem[] = items.map(({ order, ...rest }) => rest as LinkItem);
+
+      setData(prev => {
+        const currentProfile = prev?.profile || getInitialData()?.profile || defaultProfile;
+        const currentTheme = prev?.theme || getInitialData()?.theme || defaultTheme;
+        const currentAd = prev?.ad || getInitialData()?.ad || defaultAd;
+        const updated: AppData = {
+          profile: currentProfile,
+          theme: currentTheme,
+          links: finalLinks,
+          ad: currentAd,
+          updatedAt: Date.now()
+        };
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify(updated));
+        } catch (e) {}
+        return updated;
+      });
+      loaded.links = true;
+      checkAllLoaded();
+    }, (err) => {
+      console.error('Erro ao ler links:', err);
+      loaded.links = true;
+      checkAllLoaded();
+    });
+
+    return () => {
+      clearTimeout(safetyTimer);
+      unsubProfile();
+      unsubTheme();
+      unsubAd();
+      unsubLinks();
+    };
   }, []);
 
   const handleUpdateData = useCallback((updater: AppData | ((prev: AppData) => AppData)) => {
@@ -434,20 +524,71 @@ export default function App() {
         updatedAt: now,
       };
       
-      // Atualização imediata no cache do navegador para resposta visual instantânea (60 FPS)
+      // Atualização imediata no cache do navegador (60 FPS na UI)
       try {
         localStorage.setItem(CACHE_KEY, JSON.stringify(newData));
-        localStorage.setItem('linkhub_profile_version', String(now));
       } catch (e) {}
 
-      // Debounce inteligente na gravação do Firestore (evita dezenas de escritas por segundo enquanto digita)
-      if (isFirebaseConfigured) {
-        if (saveTimeoutRef.current) {
-          clearTimeout(saveTimeoutRef.current);
-        }
-        saveTimeoutRef.current = setTimeout(() => {
-          setDoc(doc(db, 'perfis', 'principal'), newData).catch(console.error);
-        }, 350);
+      if (!isFirebaseConfigured) return newData;
+
+      // 1. Gravação Isolada de Perfil
+      if (JSON.stringify(prev.profile) !== JSON.stringify(newData.profile)) {
+        if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current);
+        profileTimeoutRef.current = setTimeout(() => {
+          setDoc(doc(db, 'perfil', 'principal'), { ...newData.profile, updatedAt: now }, { merge: true }).catch(console.error);
+        }, 300);
+      }
+
+      // 2. Gravação Isolada de Tema
+      if (JSON.stringify(prev.theme) !== JSON.stringify(newData.theme)) {
+        if (themeTimeoutRef.current) clearTimeout(themeTimeoutRef.current);
+        themeTimeoutRef.current = setTimeout(() => {
+          setDoc(doc(db, 'temas', 'principal'), { ...newData.theme, updatedAt: now }, { merge: true }).catch(console.error);
+        }, 300);
+      }
+
+      // 3. Gravação Isolada de Anúncio
+      if (JSON.stringify(prev.ad) !== JSON.stringify(newData.ad)) {
+        if (adTimeoutRef.current) clearTimeout(adTimeoutRef.current);
+        adTimeoutRef.current = setTimeout(() => {
+          if (newData.ad) {
+            setDoc(doc(db, 'anuncios', 'principal'), { ...newData.ad, updatedAt: now }, { merge: true }).catch(console.error);
+          }
+        }, 300);
+      }
+
+      // 4. Gravação Isolada de Links (Coleção /links com Batch)
+      if (JSON.stringify(prev.links) !== JSON.stringify(newData.links)) {
+        if (linksTimeoutRef.current) clearTimeout(linksTimeoutRef.current);
+        linksTimeoutRef.current = setTimeout(async () => {
+          try {
+            const batch = writeBatch(db);
+            const currentLinkIds = new Set(newData.links.map(l => l.id));
+
+            // Salva / atualiza cada link com sua nova ordem
+            newData.links.forEach((link, idx) => {
+              if (link.id) {
+                batch.set(doc(db, 'links', link.id), {
+                  ...link,
+                  order: idx,
+                  updatedAt: now,
+                });
+              }
+            });
+
+            // Remove do Firestore os links deletados
+            const prevLinks = prev.links || [];
+            prevLinks.forEach(oldLink => {
+              if (oldLink.id && !currentLinkIds.has(oldLink.id)) {
+                batch.delete(doc(db, 'links', oldLink.id));
+              }
+            });
+
+            await batch.commit();
+          } catch (err) {
+            console.error('Erro ao sincronizar links com Firestore:', err);
+          }
+        }, 300);
       }
 
       return newData;

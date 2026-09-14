@@ -1068,7 +1068,7 @@ export const Preview: React.FC<PreviewProps> = ({
             }
           }}
         >
-          {links.filter(l => l.isVisible).map(link => (
+          {(links || []).filter(l => l.isVisible).map(link => (
             <LinkItemCard 
               key={link.id} 
               link={link} 

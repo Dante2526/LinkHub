@@ -10,10 +10,30 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Perfil público: qualquer visitante pode ler; gravação permitida para atualizar dados do perfil
+    // Perfil legado (mantido para permitir migração e limpeza)
     match /perfis/{perfilId} {
       allow read: if true;
       allow write: if true;
+    }
+
+    // Arquitetura Modular: Links individuais
+    match /links/{linkId} {
+      allow read, write: if true;
+    }
+
+    // Arquitetura Modular: Configurações de Tema
+    match /temas/{temaId} {
+      allow read, write: if true;
+    }
+
+    // Arquitetura Modular: Dados de Perfil (Bio, Nome, Avatar)
+    match /perfil/{perfilId} {
+      allow read, write: if true;
+    }
+
+    // Arquitetura Modular: Anúncios / Pop-ups promocionais
+    match /anuncios/{anuncioId} {
+      allow read, write: if true;
     }
 
     // Métricas de cliques: visitantes podem criar registros de cliques; leitura permitida; exclusão/alteração bloqueada
