@@ -617,6 +617,8 @@ export const Preview: React.FC<PreviewProps> = ({
   });
 
   useEffect(() => {
+    let safetyTimer: NodeJS.Timeout | null = null;
+
     if (theme.backgroundType === 'image' && theme.backgroundImageUrl) {
       setIsBackgroundReady(false);
       const img = new Image();
@@ -627,12 +629,28 @@ export const Preview: React.FC<PreviewProps> = ({
         img.onload = () => setIsBackgroundReady(true);
         img.onerror = () => setIsBackgroundReady(true);
       }
+      safetyTimer = setTimeout(() => {
+        setIsBackgroundReady(true);
+      }, 3000);
     } else if (theme.backgroundType === 'video') {
-      setIsBackgroundReady(isVideoReady);
+      if (!theme.backgroundVideoUrl) {
+        // Se a URL do vídeo estiver vazia, libera imediatamente sem bloquear
+        setIsBackgroundReady(true);
+      } else {
+        setIsBackgroundReady(isVideoReady);
+        // Timeout de segurança: no máximo 3s de loading
+        safetyTimer = setTimeout(() => {
+          setIsBackgroundReady(true);
+        }, 3000);
+      }
     } else {
       setIsBackgroundReady(true);
     }
-  }, [theme.backgroundType, theme.backgroundImageUrl, isVideoReady]);
+
+    return () => {
+      if (safetyTimer) clearTimeout(safetyTimer);
+    };
+  }, [theme.backgroundType, theme.backgroundImageUrl, theme.backgroundVideoUrl, isVideoReady]);
 
   // Responsive device mode detection for PublicView or dynamic window sizes
   const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1024);
@@ -861,9 +879,17 @@ export const Preview: React.FC<PreviewProps> = ({
              objectUrl = URL.createObjectURL(blob);
              videoBlobCache.set(url, objectUrl);
              setResolvedVideoUrl(objectUrl);
+          } else if (isMounted && (!base64String || base64String.length === 0)) {
+             console.warn("Chunks de vídeo vazios ou não encontrados no Firestore:", fileId);
+             setIsVideoReady(true);
+             setIsBackgroundReady(true);
           }
         } catch (err) {
           console.error("Erro ao remontar video", err);
+          if (isMounted) {
+            setIsVideoReady(true);
+            setIsBackgroundReady(true);
+          }
         }
       };
       loadVideo();

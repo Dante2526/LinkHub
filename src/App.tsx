@@ -15,9 +15,36 @@ const CACHE_KEY = 'linkhub_cached_profile';
 
 const getInitialData = (): AppData | null => {
   try {
-    const cached = localStorage.getItem(CACHE_KEY);
-    if (cached) {
-      const parsed = JSON.parse(cached);
+    let raw = localStorage.getItem(CACHE_KEY);
+
+    // 1. Ponte de resgate automático: Se o cache novo estiver vazio, busca na chave legada
+    if (!raw) {
+      const legacy = localStorage.getItem(STORAGE_KEY);
+      if (legacy) {
+        raw = legacy;
+        try {
+          localStorage.setItem(CACHE_KEY, legacy);
+        } catch (e) {}
+      }
+    }
+
+    if (raw) {
+      const parsed = JSON.parse(raw);
+
+      // 2. Se o cache atual tiver apenas links padrão/vazios, mas a chave legada tiver links reais, restaura os links
+      const legacyRaw = localStorage.getItem(STORAGE_KEY);
+      if (legacyRaw && (!parsed.links || parsed.links.length === 0 || (parsed.links.length <= 2 && parsed.links[0]?.title === 'Meu Canal no YouTube'))) {
+        try {
+          const legacyParsed = JSON.parse(legacyRaw);
+          if (Array.isArray(legacyParsed.links) && legacyParsed.links.length > 0 && legacyParsed.links[0]?.title !== 'Meu Canal no YouTube') {
+            parsed.links = legacyParsed.links;
+            if (legacyParsed.profile) parsed.profile = legacyParsed.profile;
+            if (legacyParsed.theme) parsed.theme = legacyParsed.theme;
+            localStorage.setItem(CACHE_KEY, JSON.stringify(parsed));
+          }
+        } catch (e) {}
+      }
+
       if (parsed?.theme) {
         if (!parsed.theme.profileTextColor) parsed.theme.profileTextColor = '#ffffff';
         if (!parsed.theme.linkTextAlign) parsed.theme.linkTextAlign = 'center';
@@ -324,12 +351,29 @@ export default function App() {
           const serverVersion = fetchedData.updatedAt || 0;
           const cachedVersion = Number(localStorage.getItem('linkhub_profile_version') || 0);
 
-          // Se o administrador alterou o tema ou adicionou links (versão mais recente):
           if (serverVersion && serverVersion > cachedVersion) {
             try {
-              // Limpa o cache antigo do localStorage do visitante
-              localStorage.removeItem(CACHE_KEY);
               localStorage.setItem('linkhub_profile_version', String(serverVersion));
+            } catch (e) {}
+          }
+
+          // Ponte de preservação/recuperação: se houver links no cache local legado que não estão no servidor, mescla-os com segurança
+          const legacyRaw = localStorage.getItem(STORAGE_KEY);
+          if (legacyRaw) {
+            try {
+              const legacyParsed = JSON.parse(legacyRaw);
+              if (Array.isArray(legacyParsed.links) && legacyParsed.links.length > 0) {
+                const currentUrls = new Set((fetchedData.links || []).map((l: any) => l.url));
+                const currentTitles = new Set((fetchedData.links || []).map((l: any) => l.title));
+                const recoveredLinks = legacyParsed.links.filter((l: any) => 
+                  !currentUrls.has(l.url) && !currentTitles.has(l.title) && l.title !== 'Meu Canal no YouTube'
+                );
+                if (recoveredLinks.length > 0) {
+                  fetchedData.links = [...(fetchedData.links || []), ...recoveredLinks];
+                  fetchedData.updatedAt = Date.now();
+                  setDoc(docRef, fetchedData).catch(console.error);
+                }
+              }
             } catch (e) {}
           }
 
@@ -349,12 +393,17 @@ export default function App() {
             console.error("Erro ao salvar cache", e);
           }
         } else {
-          const defaultData: AppData = { profile: defaultProfile, theme: defaultTheme, links: defaultLinks, ad: defaultAd, updatedAt: Date.now() };
-          setDoc(docRef, defaultData).catch(console.error);
-          setData(defaultData);
+          // Documento não existe no Firestore: NUNCA force defaultData se já houver dados no cache local!
+          const localFallback = getInitialData();
+          const initialDataToSave: AppData = (localFallback && localFallback.links && localFallback.links.length > 0)
+            ? { ...localFallback, updatedAt: Date.now() }
+            : { profile: defaultProfile, theme: defaultTheme, links: defaultLinks, ad: defaultAd, updatedAt: Date.now() };
+
+          setDoc(docRef, initialDataToSave).catch(console.error);
+          setData(initialDataToSave);
           try {
-            localStorage.setItem(CACHE_KEY, JSON.stringify(defaultData));
-            localStorage.setItem('linkhub_profile_version', String(defaultData.updatedAt || Date.now()));
+            localStorage.setItem(CACHE_KEY, JSON.stringify(initialDataToSave));
+            localStorage.setItem('linkhub_profile_version', String(initialDataToSave.updatedAt || Date.now()));
           } catch (e) {}
         }
         setLoading(false);
