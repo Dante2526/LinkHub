@@ -14,7 +14,7 @@ import { db, isFirebaseConfigured } from './lib/firebase';
 import { AppData, defaultTheme, defaultProfile, defaultLinks, defaultAd, BackgroundPosition, LinkItem, Theme, Profile, Advertisement } from './types';
 import { Preview } from './components/Preview';
 import { Smartphone, Monitor, ExternalLink, Loader2, LogOut } from 'lucide-react';
-import { checkIsAdminAuthorized } from './components/Login';
+import { checkIsAdminAuthorized } from './lib/auth';
 
 const LazyEditor = lazy(() => import('./components/Editor').then(m => ({ default: m.Editor })));
 const LazyLogin = lazy(() => import('./components/Login').then(m => ({ default: m.Login })));

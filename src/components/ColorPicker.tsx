@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { HexColorPicker } from 'react-colorful';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ColorPickerProps {
@@ -94,11 +95,11 @@ export const ColorPicker = React.memo(function ColorPicker({
         aria-label={title}
       />
       
-      {isOpen && (
+      {isOpen && typeof document !== 'undefined' && createPortal(
         <>
           {/* Backdrop para fechar ao tocar fora */}
           <div 
-            className="fixed inset-0 z-[90] bg-black/25 backdrop-blur-[0.5px] sm:bg-transparent"
+            className="fixed inset-0 z-[99990] bg-black/25 backdrop-blur-[0.5px] sm:bg-transparent"
             onClick={() => setIsOpen(false)}
           />
 
@@ -111,7 +112,7 @@ export const ColorPicker = React.memo(function ColorPicker({
               width: '256px',
               maxWidth: 'calc(100vw - 24px)'
             }}
-            className="fixed z-[100] p-4 bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-150 text-white"
+            className="fixed z-[99999] p-4 bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-150 text-white"
           >
             {/* Cabeçalho com botão fechar */}
             <div className="flex items-center justify-between pb-2 border-b border-gray-700">
@@ -157,7 +158,8 @@ export const ColorPicker = React.memo(function ColorPicker({
               />
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );
