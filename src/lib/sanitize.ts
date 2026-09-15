@@ -1,5 +1,5 @@
-const SAFE_URL_RE = /^(https?:|mailto:|tel:|blob:)/i;
-const BLOCKED_RE = /^(javascript:|data:|vbscript:|file:|about:)/i;
+const SAFE_URL_RE = /^(https?:|mailto:|tel:|blob:|data:image\/)/i;
+const BLOCKED_RE = /^(javascript:|vbscript:|file:|about:)/i; // Removido data: da lista geral, data:image/ é permitido
 
 export function sanitizeUrl(raw: string): string {
   const trimmed = (raw || '').trim();
@@ -8,6 +8,12 @@ export function sanitizeUrl(raw: string): string {
     if (import.meta.env.DEV) console.warn('URL bloqueada por seguranca:', trimmed);
     return '';
   }
+  // Bloqueia data: URIs que não sejam imagens
+  if (/^data:/i.test(trimmed) && !/^data:image\//i.test(trimmed)) {
+    if (import.meta.env.DEV) console.warn('Data URI não-imagem bloqueado:', trimmed);
+    return '';
+  }
+  
   if (!SAFE_URL_RE.test(trimmed)) {
     return `https://${trimmed}`;
   }
@@ -19,7 +25,8 @@ export function sanitizeCssUrl(raw: string): string {
   const cleaned = raw.replace(/[\u0000-\u001F]/g, '');
   try {
     const u = new URL(cleaned);
-    if (!/^https?:$/.test(u.protocol)) throw new Error('bad protocol');
+    if (!/^https?:$/.test(u.protocol) && !/^data:/.test(u.protocol)) throw new Error('bad protocol');
+    if (/^data:/.test(u.protocol) && !/^data:image\//i.test(cleaned)) throw new Error('only data:image is allowed');
   } catch { return 'none'; }
   const escaped = cleaned.replace(/(["'\\])/g, '\\$1');
   return `url('${escaped}')`;

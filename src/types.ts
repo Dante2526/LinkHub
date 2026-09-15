@@ -31,6 +31,7 @@ export interface Theme {
   linkTextAlign?: 'center' | 'left';
   linkThumbnailPosition?: 'left' | 'right';
   linkThumbnailShape?: ThumbnailShape;
+  updatedAt?: number;
 }
 
 export interface LinkItem {
@@ -45,12 +46,15 @@ export interface LinkItem {
   animation?: LinkAnimation;
   textColor?: string;
   buttonColor?: string;
+  updatedAt?: number;
+  order?: number;
 }
 
 export interface Profile {
   name: string;
   bio: string;
   avatarUrl: string;
+  updatedAt?: number;
 }
 
 export interface Advertisement {

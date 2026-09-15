@@ -366,7 +366,7 @@ export default function App() {
     // Timeout de segurança absoluto: no máximo 2s de tela de loading
     const safetyTimer = setTimeout(() => {
       setLoading(false);
-    }, 2000);
+    }, 5000);
 
     // 1. Migração automática: se perfis/principal ainda existir, migra para as 4 coleções e exclui o antigo
     const runMigrationIfNeeded = async () => {

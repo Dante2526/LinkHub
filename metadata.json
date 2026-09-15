@@ -2,7 +2,5 @@
   "name": "LinkHub",
   "description": "LinkHub - Plataforma e organizador inteligente de links com temas dinâmicos e painel customizável.",
   "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "majorCapabilities": []
 }
