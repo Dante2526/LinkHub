@@ -6,6 +6,9 @@ import { CustomSelect, SelectOption } from './CustomSelect';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { collection, getCountFromServer, getDocs, query, orderBy, limit, setDoc, doc, where } from 'firebase/firestore';
 import { db, storage, isFirebaseConfigured } from '../lib/firebase';
+import { sanitizeUrl } from '../lib/sanitize';
+import { Reorder } from 'framer-motion';
+import { LinkItemEditorRow } from './LinkItemEditorRow';
 
 const BACKGROUND_TYPE_OPTIONS: SelectOption[] = [
   { value: 'color', label: 'Cor Sólida', subtitle: 'Cor única de fundo' },
@@ -122,11 +125,19 @@ export const Editor: React.FC<EditorProps> = ({
   const bgVideoInputRef = useRef<HTMLInputElement>(null);
   const adImageInputRef = useRef<HTMLInputElement>(null);
 
+  const URL_FIELDS: Record<string, string[]> = {
+    link: ['url', 'thumbnailUrl'],
+    profile: ['avatarUrl'],
+    theme: ['backgroundImageUrl', 'backgroundVideoUrl'],
+    ad: ['buttonUrl', 'imageUrl'],
+  };
+
   const updateAd = (field: keyof Advertisement, value: any) => {
+    const v = URL_FIELDS.ad.includes(field as string) && typeof value === 'string' ? sanitizeUrl(value) : value;
     const currentAd = data.ad || defaultAd;
     const updated: Advertisement = {
       ...currentAd,
-      [field]: value,
+      [field]: v,
       updatedAt: Date.now()
     };
     onChange({ ...data, ad: updated });
@@ -302,11 +313,13 @@ export const Editor: React.FC<EditorProps> = ({
   }, [activeTab]);
 
   const updateProfile = (field: keyof AppData['profile'], value: string) => {
-    onChange({ ...data, profile: { ...data.profile, [field]: value } });
+    const v = URL_FIELDS.profile.includes(field as string) ? sanitizeUrl(value) : value;
+    onChange({ ...data, profile: { ...data.profile, [field]: v } });
   };
 
   const updateTheme = (field: keyof Theme, value: any) => {
-    onChange({ ...data, theme: { ...data.theme, [field]: value } });
+    const v = URL_FIELDS.theme.includes(field as string) && typeof value === 'string' ? sanitizeUrl(value) : value;
+    onChange({ ...data, theme: { ...data.theme, [field]: v } });
   };
 
   const currentMode = previewMode || 'mobile';
@@ -337,16 +350,31 @@ export const Editor: React.FC<EditorProps> = ({
   };
 
   const updateLink = (id: string, field: keyof LinkItem, value: any) => {
-    const newLinks = data.links.map(l => l.id === id ? { ...l, [field]: value } : l);
+    const v = URL_FIELDS.link.includes(field as string) && typeof value === 'string' ? sanitizeUrl(value) : value;
+    const newLinks = data.links.map(l => l.id === id ? { ...l, [field]: v } : l);
     onChange({ ...data, links: newLinks });
+  };
+
+  const MAX_IMAGE = 10 * 1024 * 1024; // 10MB
+  const MAX_VIDEO = 5 * 1024 * 1024; // 5MB
+  const ALLOWED_MIME = {
+    image: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+    video: ['video/mp4', 'video/webm', 'image/gif'],
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video', targetField: keyof Theme | keyof AppData['profile'] | 'linkThumb', linkId?: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (type === 'video' && file.size > 5 * 1024 * 1024) {
-      alert("O arquivo é muito grande. O limite para vídeos/GIFs é de 5MB.");
+    if (!ALLOWED_MIME[type].includes(file.type)) {
+      alert(`Tipo não permitido: ${file.type || 'desconhecido'}`);
+      e.target.value = '';
+      return;
+    }
+
+    const max = type === 'video' ? MAX_VIDEO : MAX_IMAGE;
+    if (file.size > max) {
+      alert(`Arquivo excede o limite de ${max / 1024 / 1024}MB.`);
       e.target.value = '';
       return;
     }
@@ -427,38 +455,45 @@ export const Editor: React.FC<EditorProps> = ({
       <div className="px-6 pb-2">
         <div className="flex bg-gray-900/90 border border-gray-800 p-1.5 rounded-2xl gap-1.5 overflow-x-auto no-scrollbar shadow-inner">
           <button
+            type="button"
             onClick={() => setActiveTab('links')}
-            className={`flex-1 py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-xs whitespace-nowrap transition-all ${
+            className={`flex-1 py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-xs whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'links' 
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
                 : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
             }`}
           >
+            <LinkIcon className="w-3.5 h-3.5 flex-shrink-0" />
             Links
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('profile')}
-            className={`flex-1 py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-xs whitespace-nowrap transition-all ${
+            className={`flex-1 py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-xs whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'profile' 
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
                 : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
             }`}
           >
+            <User className="w-3.5 h-3.5 flex-shrink-0" />
             Perfil
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('theme')}
-            className={`flex-1 py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-xs whitespace-nowrap transition-all ${
+            className={`flex-1 py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-xs whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'theme' 
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
                 : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
             }`}
           >
+            <Palette className="w-3.5 h-3.5 flex-shrink-0" />
             Tema
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('ad')}
-            className={`flex-1 py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-xs whitespace-nowrap transition-all ${
+            className={`flex-1 py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-xs whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'ad' 
                 ? 'bg-[#ee4d2d] text-white shadow-md shadow-[#ee4d2d]/30' 
                 : 'text-gray-400 hover:text-[#ee4d2d] hover:bg-gray-800/60'
@@ -469,13 +504,15 @@ export const Editor: React.FC<EditorProps> = ({
             Anúncio
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('stats')}
-            className={`flex-1 py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-xs whitespace-nowrap transition-all ${
+            className={`flex-1 py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-xs whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'stats' 
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
                 : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
             }`}
           >
+            <BarChart3 className="w-3.5 h-3.5 flex-shrink-0" />
             Métricas
           </button>
         </div>
@@ -485,8 +522,9 @@ export const Editor: React.FC<EditorProps> = ({
         {activeTab === 'links' && (
           <div className="space-y-4 flex flex-col pb-8">
             <button 
+              type="button"
               onClick={addLink}
-              className="w-full py-3.5 bg-blue-600 text-white rounded-full font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors shadow-sm"
+              className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-600 active:scale-[0.99] text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 transition-all cursor-pointer"
             >
               <Plus className="w-5 h-5" /> Adicionar Link
             </button>
@@ -604,241 +642,32 @@ export const Editor: React.FC<EditorProps> = ({
               </div>
             </div>
             
-            <div className="space-y-4 mt-2">
+            <Reorder.Group
+              axis="y"
+              values={data.links}
+              onReorder={(newLinks) => onChange({ ...data, links: newLinks })}
+              className="space-y-4 mt-2"
+            >
               {data.links.map((link, index) => (
-                <div key={link.id} className="bg-gray-800 rounded-3xl py-5 px-10 sm:px-12 shadow-sm border border-gray-700/50 relative transition-all flex justify-center">
-                  <div className="absolute left-1 sm:left-4 top-0 bottom-0 flex flex-col items-center justify-center gap-2 text-gray-600 w-8">
-                    <button onClick={() => moveLink(index, 'up')} disabled={index === 0} className="hover:text-blue-500 disabled:opacity-30">▲</button>
-                    <GripVertical className="w-5 h-5 opacity-50 mx-auto" />
-                    <button onClick={() => moveLink(index, 'down')} disabled={index === data.links.length - 1} className="hover:text-blue-500 disabled:opacity-30">▼</button>
-                  </div>
-                     
-                  <div className="w-full space-y-3">
-                    <div>
-                      <input 
-                        type="text" 
-                        value={link.title}
-                        onChange={(e) => updateLink(link.id, 'title', e.target.value)}
-                        placeholder="Título do Link"
-                        className="w-full text-center bg-gray-900/60 border-transparent rounded-xl px-4 py-3 text-sm text-white placeholder-gray-400 focus:outline-none focus:bg-gray-900 focus:ring-2 focus:ring-blue-500/20 font-medium transition-all"
-                      />
-                    </div>
-                    <div>
-                      <input 
-                        type="text" 
-                        value={link.description || ''}
-                        onChange={(e) => updateLink(link.id, 'description', e.target.value)}
-                        placeholder="Descrição (opcional)"
-                        className="w-full text-center bg-gray-900/60 border-transparent rounded-xl px-4 py-3 text-sm text-white placeholder-gray-400 focus:outline-none focus:bg-gray-900 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                      />
-                    </div>
-                    <div>
-                      <input 
-                        type="url" 
-                        value={link.url}
-                        onChange={(e) => updateLink(link.id, 'url', e.target.value)}
-                        placeholder="URL (https://...)"
-                        className="w-full text-center bg-gray-900/60 border-transparent rounded-xl px-4 py-3 text-sm text-white placeholder-gray-400 focus:outline-none focus:bg-gray-900 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                      />
-                    </div>
-                    <div className="flex gap-2 justify-center relative">
-                      <label className="absolute left-0 cursor-pointer w-11 h-11 bg-gray-900/60 hover:bg-gray-700 rounded-xl flex items-center justify-center transition-colors border border-transparent" title="Anexar Imagem">
-                        <ImageIcon className="w-5 h-5 text-gray-500" />
-                        <input 
-                          type="file" 
-                          accept="image/*"
-                          onChange={(e) => handleFileUpload(e, 'image', 'linkThumb', link.id)}
-                          className="hidden"
-                        />
-                      </label>
-                      <input 
-                        type="url" 
-                        value={link.thumbnailUrl || ''}
-                        onChange={(e) => updateLink(link.id, 'thumbnailUrl', e.target.value)}
-                        placeholder="URL do Ícone ou anexe uma imagem"
-                        className="w-full text-center pl-12 pr-12 bg-gray-900/60 border-transparent rounded-xl py-3 text-sm text-white placeholder-gray-400 focus:outline-none focus:bg-gray-900 focus:ring-2 focus:ring-blue-500/20 transition-all"
-                      />
-                    </div>
-                    {link.thumbnailUrl && (
-                      <div className="pt-2 flex flex-col items-center">
-                        <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2 px-1 text-center">Posição da Foto</label>
-                        <div className="flex justify-center gap-1.5 bg-gray-900/90 border border-gray-800 p-1.5 rounded-2xl w-full max-w-[280px]">
-                          <button 
-                            type="button"
-                            onClick={() => updateLink(link.id, 'thumbnailPosition', 'left')}
-                            className={`flex-1 py-1.5 px-3 text-xs rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 ${
-                              (!link.thumbnailPosition || link.thumbnailPosition === 'left') 
-                                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
-                                : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
-                            }`}
-                          >
-                            <span>Esquerda</span>
-                          </button>
-                          <button 
-                            type="button"
-                            onClick={() => updateLink(link.id, 'thumbnailPosition', 'right')}
-                            className={`flex-1 py-1.5 px-3 text-xs rounded-xl font-semibold transition-all flex items-center justify-center gap-1.5 ${
-                              link.thumbnailPosition === 'right' 
-                                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
-                                : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
-                            }`}
-                          >
-                            <span>Direita</span>
-                          </button>
-                        </div>
-
-                        <div className="w-full pt-3">
-                          <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2 px-1 text-center">Formato da Imagem</label>
-                          <div className="flex bg-gray-900/90 border border-gray-800 p-1.5 rounded-2xl gap-1.5 w-full max-w-[380px] mx-auto">
-                            <button 
-                              type="button"
-                              onClick={() => updateLink(link.id, 'thumbnailShape', 'round')}
-                              className={`flex-1 py-2 px-2 text-xs rounded-xl font-semibold whitespace-nowrap transition-all ${
-                                (!link.thumbnailShape ? (!data.theme.linkThumbnailShape || data.theme.linkThumbnailShape === 'round') : link.thumbnailShape === 'round')
-                                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
-                                  : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
-                              }`}
-                            >
-                              Círculo
-                            </button>
-                            <button 
-                              type="button"
-                              onClick={() => updateLink(link.id, 'thumbnailShape', 'rounded')}
-                              className={`flex-1 py-2 px-2 text-xs rounded-xl font-semibold whitespace-nowrap transition-all ${
-                                link.thumbnailShape === 'rounded' 
-                                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
-                                  : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
-                              }`}
-                            >
-                              Arredondado
-                            </button>
-                            <button 
-                              type="button"
-                              onClick={() => updateLink(link.id, 'thumbnailShape', 'square')}
-                              className={`flex-1 py-2 px-2 text-xs rounded-xl font-semibold whitespace-nowrap transition-all ${
-                                link.thumbnailShape === 'square' 
-                                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
-                                  : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
-                              }`}
-                            >
-                              Quadrado
-                            </button>
-                            <button 
-                              type="button"
-                              onClick={() => updateLink(link.id, 'thumbnailShape', 'match-card')}
-                              className={`flex-1 py-2 px-2 text-xs rounded-xl font-semibold whitespace-nowrap transition-all ${
-                                (link.thumbnailShape === 'match-card' || (!link.thumbnailShape && data.theme.linkThumbnailShape === 'match-card'))
-                                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' 
-                                  : 'text-gray-400 hover:text-white hover:bg-gray-800/60'
-                              }`}
-                              title="Formato acompanha o formato do cartão de link"
-                            >
-                              Do Cartão
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <div className="pt-2 flex flex-col items-center">
-                      <label className="text-xs font-semibold text-gray-400 uppercase tracking-wider block mb-2 px-1 text-center">Animação em Destaque</label>
-                      <div className="flex flex-wrap justify-center gap-1.5 bg-gray-900/90 border border-gray-800 p-1.5 rounded-2xl w-full">
-                        <button 
-                          type="button"
-                          onClick={() => updateLink(link.id, 'animation', 'none')}
-                          className={`flex-1 min-w-[70px] py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${!link.animation || link.animation === 'none' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
-                        >Nenhuma</button>
-                        <button 
-                          type="button"
-                          onClick={() => updateLink(link.id, 'animation', 'pulse')}
-                          className={`flex-1 min-w-[70px] py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${link.animation === 'pulse' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
-                        >Pulsar</button>
-                        <button 
-                          type="button"
-                          onClick={() => updateLink(link.id, 'animation', 'bounce')}
-                          className={`flex-1 min-w-[70px] py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${link.animation === 'bounce' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
-                        >Saltar</button>
-                        <button 
-                          type="button"
-                          onClick={() => updateLink(link.id, 'animation', 'shake')}
-                          className={`flex-1 min-w-[70px] py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${link.animation === 'shake' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
-                        >Tremer</button>
-                        <button 
-                          type="button"
-                          onClick={() => updateLink(link.id, 'animation', 'glow')}
-                          className={`flex-1 min-w-[70px] py-1.5 px-2 text-xs rounded-xl font-semibold transition-all ${link.animation === 'glow' ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30' : 'text-gray-400 hover:text-white hover:bg-gray-800/60'}`}
-                        >Brilho</button>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-center pt-4 px-1 relative">
-                      <label className="flex items-center gap-3 cursor-pointer group">
-                        <div className={`w-10 h-6 rounded-full p-1 transition-colors ${link.isVisible ? 'bg-blue-600' : 'bg-gray-300'}`}>
-                          <div className={`w-4 h-4 bg-gray-800 rounded-full shadow-sm transition-transform ${link.isVisible ? 'translate-x-4' : 'translate-x-0'}`}></div>
-                        </div>
-                        <input 
-                          type="checkbox" 
-                          checked={link.isVisible}
-                          onChange={(e) => updateLink(link.id, 'isVisible', e.target.checked)}
-                          className="hidden"
-                        />
-                        <span className="text-sm font-semibold text-gray-600">Visível</span>
-                      </label>
-                      
-                      <button 
-                        onClick={() => removeLink(link.id)}
-                        className="absolute right-0 text-red-400 hover:bg-red-500/10 p-2 rounded-full transition-colors"
-                        title="Remover link"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </div>
-
-                    {/* Personalizar cores deste link individual */}
-                    <div className="pt-3 border-t border-gray-700/50 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500">
-                      <span className="font-semibold text-xs text-gray-600">Cores deste link:</span>
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5" title="Cor do texto deste link">
-                          <span className="text-xs text-gray-500">Texto</span>
-                          <ColorPicker 
-                            color={link.textColor || data.theme.buttonTextColor || '#000000'}
-                            onChange={(color) => updateLink(link.id, 'textColor', color)}
-                            title="Cor do Texto"
-                            className="w-8 h-8"
-                          />
-                        </div>
-                        <div className="flex items-center gap-1.5" title="Cor do fundo deste link">
-                          <span className="text-xs text-gray-500">Fundo</span>
-                          <ColorPicker 
-                            color={link.buttonColor || data.theme.buttonColor || '#ffffff'}
-                            onChange={(color) => updateLink(link.id, 'buttonColor', color)}
-                            title="Cor do Fundo"
-                            className="w-8 h-8"
-                          />
-                        </div>
-                        {(link.textColor || link.buttonColor) && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              updateLink(link.id, 'textColor', undefined);
-                              updateLink(link.id, 'buttonColor', undefined);
-                            }}
-                            className="text-xs text-blue-400 font-semibold hover:underline ml-1"
-                            title="Restaurar cores padrão"
-                          >
-                            Resetar
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <LinkItemEditorRow
+                  key={link.id}
+                  link={link}
+                  index={index}
+                  totalLinks={data.links.length}
+                  moveLink={moveLink}
+                  updateLink={updateLink}
+                  removeLink={removeLink}
+                  handleFileUpload={handleFileUpload}
+                  theme={data.theme}
+                />
               ))}
-              
-              {data.links.length === 0 && (
-                <div className="text-center py-12 text-gray-500 bg-gray-800 rounded-3xl border border-dashed border-gray-700">
-                  <span className="font-medium">Nenhum link adicionado ainda.</span>
-                </div>
-              )}
-            </div>
+            </Reorder.Group>
+
+            {data.links.length === 0 && (
+              <div className="text-center py-12 text-gray-500 bg-gray-800 rounded-3xl border border-dashed border-gray-700">
+                <span className="font-medium">Nenhum link adicionado ainda.</span>
+              </div>
+            )}
           </div>
         )}
 

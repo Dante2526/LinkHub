@@ -7,16 +7,20 @@ const rawProjectId = import.meta.env.VITE_FIREBASE_PROJECT_ID?.trim();
 
 export const isFirebaseConfigured = Boolean(rawApiKey && rawProjectId);
 
-const firebaseConfig = {
-  apiKey: rawApiKey || 'AIzaSyDummyKeyForLocalPreview1234567890',
+if (import.meta.env.PROD && !isFirebaseConfigured) {
+  throw new Error('Firebase config ausente em producao. Defina VITE_FIREBASE_API_KEY e VITE_FIREBASE_PROJECT_ID.');
+}
+
+const firebaseConfig = isFirebaseConfigured ? {
+  apiKey: rawApiKey!,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN?.trim() || 'linkhub-preview.firebaseapp.com',
-  projectId: rawProjectId || 'linkhub-preview',
+  projectId: rawProjectId!,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET?.trim() || 'linkhub-preview.appspot.com',
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID?.trim() || '123456789012',
   appId: import.meta.env.VITE_FIREBASE_APP_ID?.trim() || '1:123456789012:web:abcdef123456'
-};
+} : null;
 
-export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+export const app = firebaseConfig ? (getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)) : null as any;
+export const db = app ? getFirestore(app) : null as any;
+export const storage = app ? getStorage(app) : null as any;
 

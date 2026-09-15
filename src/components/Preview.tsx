@@ -7,6 +7,8 @@ import { doc, getDoc } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
 import { getCachedVideoBlob, setCachedVideoBlob } from '../lib/videoCache';
+import { sanitizeCssUrl, sanitizeUrl, isPrivateUrl } from '../lib/sanitize';
+import { AdvertisementModal } from './AdvertisementModal';
 
 interface PreviewProps {
   data: AppData;
@@ -15,6 +17,7 @@ interface PreviewProps {
   isRepositioning?: boolean;
   onRepositionEnd?: () => void;
   onPositionChange?: (pos: BackgroundPosition) => void;
+  publicProfileUrl?: string;
 }
 
 // Global cache for reconstructed video blob URLs across component renders
@@ -33,7 +36,7 @@ const getBackgroundStyle = (theme: Theme, position: BackgroundPosition = { x: 50
       };
     case 'image':
       return { 
-        backgroundImage: `url(${theme.backgroundImageUrl})`,
+        backgroundImage: sanitizeCssUrl(theme.backgroundImageUrl || ''),
         backgroundSize: 'cover',
         backgroundPosition: `${position.x}% ${position.y}%`,
         backgroundColor: theme.backgroundColor || '#111827'
@@ -320,7 +323,7 @@ interface LinkItemCardProps {
   }) => void;
 }
 
-const LinkItemCard: React.FC<LinkItemCardProps> = ({ 
+const LinkItemCard: React.FC<LinkItemCardProps> = React.memo(({ 
   link, 
   theme, 
   onLinkClick,
@@ -386,7 +389,20 @@ const LinkItemCard: React.FC<LinkItemCardProps> = ({
     if (isNavigatingRef.current) return;
     isNavigatingRef.current = true;
 
-    const targetUrl = normalizedUrl;
+    const targetUrl = sanitizeUrl(normalizedUrl);
+    if (!targetUrl || targetUrl === '#') {
+      isNavigatingRef.current = false;
+      return;
+    }
+
+    const isMailOrTel = targetUrl.startsWith('mailto:') || targetUrl.startsWith('tel:');
+    let popup: Window | null = null;
+    
+    // Abre a aba AGORA - ainda temos user activation
+    if (!isMailOrTel) {
+      popup = window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    }
+
     const themeColors = getAppliedThemeColors(theme, link);
 
     if (onTriggerCircleTransition) {
@@ -399,21 +415,15 @@ const LinkItemCard: React.FC<LinkItemCardProps> = ({
         textColor: themeColors.textColor,
         url: targetUrl,
       });
-      setTimeout(() => {
-        isNavigatingRef.current = false;
-      }, 800);
-      return;
     }
 
-    // Fallback caso não haja trigger configurado
+    // Fallback: popup bloqueado -> mesma aba
     setTimeout(() => {
       isNavigatingRef.current = false;
-      if (targetUrl && targetUrl !== '#') {
-        if (targetUrl.startsWith('mailto:') || targetUrl.startsWith('tel:')) {
-          window.location.href = targetUrl;
-        } else {
-          window.open(targetUrl, '_blank', 'noopener,noreferrer');
-        }
+      if (!popup && !isMailOrTel) {
+        window.location.href = targetUrl;
+      } else if (isMailOrTel) {
+        window.location.href = targetUrl;
       }
     }, 450);
   };
@@ -528,7 +538,7 @@ const LinkItemCard: React.FC<LinkItemCardProps> = ({
         <div className="relative w-full flex items-center justify-center min-h-[58px] py-3.5 px-4 text-center">
           {link.thumbnailUrl && (
             <div className={`absolute ${isRight ? 'right-3.5' : 'left-3.5'} top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center ${thumbShapeClass} overflow-hidden flex-shrink-0`}>
-              <img src={link.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+              <img src={link.thumbnailUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
             </div>
           )}
           
@@ -540,7 +550,7 @@ const LinkItemCard: React.FC<LinkItemCardProps> = ({
       )}
     </motion.a>
   );
-};
+});
 
 export const Preview: React.FC<PreviewProps> = ({ 
   data, 
@@ -595,19 +605,9 @@ export const Preview: React.FC<PreviewProps> = ({
   }, []);
 
   const handleCircleReadyToNavigate = useCallback(() => {
-    const targetUrl = pendingNavigationUrlRef.current;
-    if (targetUrl && targetUrl !== '#') {
-      const lower = targetUrl.trim().toLowerCase();
-      if (lower.startsWith('javascript:') || lower.startsWith('data:') || lower.startsWith('vbscript:')) {
-        console.warn('URL bloqueada por segurança:', targetUrl);
-        return;
-      }
-      if (targetUrl.startsWith('mailto:') || targetUrl.startsWith('tel:')) {
-        window.location.href = targetUrl;
-      } else {
-        window.open(targetUrl, '_blank', 'noopener,noreferrer');
-      }
-    }
+    // A navegação real (window.open) agora é feita de forma síncrona no handleClick
+    // para evitar bloqueio pelo navegador. Aqui mantemos apenas para efeitos colaterais
+    // caso necessário no futuro.
   }, []);
 
   const handleCircleFinished = useCallback(() => {
@@ -657,16 +657,22 @@ export const Preview: React.FC<PreviewProps> = ({
     };
   }, [theme.backgroundType, theme.backgroundImageUrl, theme.backgroundVideoUrl, isVideoReady]);
 
-  // Responsive device mode detection for PublicView or dynamic window sizes
-  const [windowWidth, setWindowWidth] = useState(() => typeof window !== 'undefined' ? window.innerWidth : 1024);
+  // Responsive device mode detection using matchMedia to prevent constant resize repaints
+  const [isMobileDevice, setIsMobileDevice] = useState(() => 
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : false
+  );
 
   useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    if (typeof window === 'undefined') return;
+    const mediaQuery = window.matchMedia('(max-width: 767px)');
+    const handleMediaChange = (e: MediaQueryListEvent) => {
+      setIsMobileDevice(e.matches);
+    };
+    mediaQuery.addEventListener('change', handleMediaChange);
+    return () => mediaQuery.removeEventListener('change', handleMediaChange);
   }, []);
 
-  const effectiveMode: 'mobile' | 'desktop' = previewMode || (windowWidth < 768 ? 'mobile' : 'desktop');
+  const effectiveMode: 'mobile' | 'desktop' = previewMode || (isMobileDevice ? 'mobile' : 'desktop');
 
   const activePosition: BackgroundPosition = (effectiveMode === 'mobile'
     ? (theme.backgroundPositionMobile || theme.backgroundPositionDesktop)
@@ -711,9 +717,8 @@ export const Preview: React.FC<PreviewProps> = ({
     }
   };
 
-  // Advertisement / Shopee Promo Modal State
+  // Advertisement / Shopee Promo Modal State (display logic and frequency check)
   const [isAdOpen, setIsAdOpen] = useState(false);
-  const [adCountdown, setAdCountdown] = useState<number>(ad?.timerSeconds || 5);
 
   // Check frequency (3 hours by default) and display ad if appropriate
   useEffect(() => {
@@ -734,7 +739,6 @@ export const Preview: React.FC<PreviewProps> = ({
 
       if (hasExpired || isNewAdVersion) {
         setIsAdOpen(true);
-        setAdCountdown(ad.timerSeconds || 5);
         if (ad.updatedAt) {
           localStorage.setItem('linkhub_last_ad_updated_at', ad.updatedAt.toString());
         }
@@ -746,7 +750,6 @@ export const Preview: React.FC<PreviewProps> = ({
     // Listen for manual preview test triggers from Admin Editor
     const handleTriggerPreview = () => {
       setIsAdOpen(true);
-      setAdCountdown(ad?.timerSeconds || 5);
     };
 
     window.addEventListener('linkhub_trigger_ad_preview', handleTriggerPreview);
@@ -755,78 +758,16 @@ export const Preview: React.FC<PreviewProps> = ({
     };
   }, [ad]);
 
-  // 5-second countdown timer
-  useEffect(() => {
-    if (!isAdOpen || adCountdown <= 0) return;
-    const timer = setTimeout(() => {
-      setAdCountdown(prev => Math.max(0, prev - 1));
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [isAdOpen, adCountdown]);
-
-  const [adRipples, setAdRipples] = useState<EllipseRipple[]>([]);
-  const isAdOpeningRef = useRef(false);
-
-  const handleCloseAd = () => {
-    if (adCountdown > 0) return;
-    localStorage.setItem('linkhub_last_ad_seen', Date.now().toString());
+  const handleCloseAd = useCallback(() => {
+    try {
+      localStorage.setItem('linkhub_last_ad_seen', Date.now().toString());
+    } catch {}
     setIsAdOpen(false);
-  };
+  }, []);
 
-  const triggerAdRipple = (clientX: number, clientY: number, target: HTMLElement) => {
-    const rect = target.getBoundingClientRect();
-    const x = clientX ? clientX - rect.left : rect.width / 2;
-    const y = clientY ? clientY - rect.top : rect.height / 2;
-    const maxRadius = Math.hypot(Math.max(x, rect.width - x), Math.max(y, rect.height - y));
-    const id = Date.now() + Math.random();
-    setAdRipples(prev => [...prev.slice(-1), {
-      id,
-      x,
-      y,
-      width: Math.max(maxRadius * 2.5, rect.width * 1.35),
-      height: Math.max(maxRadius * 1.6, rect.height * 2.2),
-      fill: 'rgba(255, 255, 255, 0.28)',
-      border: 'rgba(255, 255, 255, 0.65)',
-    }]);
-  };
+  const publicUrl = typeof window !== 'undefined' ? window.location.href : 'https://linkhub.com';
 
-  const handleAdPointerDown = (e: React.PointerEvent<HTMLAnchorElement>) => {
-    if (e.button !== 0) return;
-    triggerAdRipple(e.clientX, e.clientY, e.currentTarget);
-  };
-
-  const handleAdCtaClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clientX = e.clientX || (rect.left + rect.width / 2);
-    const clientY = e.clientY || (rect.top + rect.height / 2);
-    triggerAdRipple(clientX, clientY, e.currentTarget);
-
-    if (isAdOpeningRef.current) return;
-    isAdOpeningRef.current = true;
-
-    // Rastreia a intenção de compra da propaganda
-    if (onLinkClick) {
-      onLinkClick('__advertisement__');
-    }
-
-    localStorage.setItem('linkhub_last_ad_seen', Date.now().toString());
-
-    handleTriggerCircleTransition({
-      clientX,
-      clientY,
-      color: '#ee4d2d',
-      background: 'linear-gradient(135deg, #ee4d2d 0%, #ff6433 100%)',
-      borderColor: '#ff7a45',
-      textColor: '#ffffff',
-      url: ad.buttonUrl,
-    });
-
-    setTimeout(() => {
-      isAdOpeningRef.current = false;
-      setIsAdOpen(false);
-    }, 450);
-  };
+  const objectUrlsThisRunRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const url = theme.backgroundVideoUrl;
@@ -853,6 +794,7 @@ export const Preview: React.FC<PreviewProps> = ({
         if (cachedBlob) {
           isCachedResolved = true;
           objectUrl = URL.createObjectURL(cachedBlob);
+          objectUrlsThisRunRef.current.add(objectUrl);
           videoBlobCache.set(url, objectUrl);
           setResolvedVideoUrl(objectUrl);
         }
@@ -882,6 +824,7 @@ export const Preview: React.FC<PreviewProps> = ({
              // Cache in IndexedDB for instant future visits
              setCachedVideoBlob(url, blob);
              objectUrl = URL.createObjectURL(blob);
+             objectUrlsThisRunRef.current.add(objectUrl);
              videoBlobCache.set(url, objectUrl);
              setResolvedVideoUrl(objectUrl);
           } else if (isMounted && (!base64String || base64String.length === 0)) {
@@ -901,13 +844,20 @@ export const Preview: React.FC<PreviewProps> = ({
       
       return () => {
         isMounted = false;
+        objectUrlsThisRunRef.current.forEach(u => {
+          URL.revokeObjectURL(u);
+          for (const [key, val] of videoBlobCache.entries()) {
+            if (val === u) {
+              videoBlobCache.delete(key);
+            }
+          }
+        });
+        objectUrlsThisRunRef.current.clear();
       };
     } else {
       setResolvedVideoUrl(url || null);
     }
   }, [theme.backgroundVideoUrl]);
-
-  const publicUrl = typeof window !== 'undefined' ? window.location.origin : 'https://linkhub.com';
 
   return (
     <div 
@@ -934,7 +884,7 @@ export const Preview: React.FC<PreviewProps> = ({
           poster={theme.backgroundImageUrl || undefined}
           onLoadedData={() => setIsVideoReady(true)}
           onCanPlay={() => setIsVideoReady(true)}
-          className={`absolute inset-0 w-full h-full object-cover pointer-events-none z-0 transition-opacity duration-700 ease-out ${isVideoReady ? 'opacity-100' : 'opacity-0'}`}
+          className={`absolute inset-0 w-full h-full object-cover pointer-events-none z-0 transition-opacity duration-700 ease-out transform-gpu will-change-transform ${isVideoReady ? 'opacity-100' : 'opacity-0'}`}
           style={{ objectPosition: `${activePosition.x}% ${activePosition.y}%` }}
         >
           <source src={resolvedVideoUrl} />
@@ -1131,189 +1081,15 @@ export const Preview: React.FC<PreviewProps> = ({
       </AnimatePresence>
 
       {/* Centralized Advertisement / Shopee Promo Modal */}
-      <AnimatePresence>
-        {isAdOpen && ad && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/80 backdrop-blur-md overflow-hidden"
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              transition={{ type: "spring", stiffness: 350, damping: 25 }}
-              className="bg-white rounded-[24px] sm:rounded-[28px] overflow-hidden w-full max-w-[340px] sm:max-w-[360px] shadow-2xl relative border border-gray-100 flex flex-col my-auto max-h-[94%]"
-              style={{ color: '#000', fontFamily: 'system-ui, -apple-system, sans-serif' }}
-            >
-              {/* Top Bar with Badge and Countdown / Close Button */}
-              <div className="flex items-center justify-between px-3.5 py-2.5 bg-gradient-to-r from-orange-50/80 via-white to-orange-50/80 border-b border-orange-100/80 flex-shrink-0 gap-2">
-                {/* Badge à esquerda com respiro */}
-                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[#ee4d2d] text-white text-[10px] sm:text-[11px] font-black rounded-full shadow-xs uppercase tracking-wider min-w-0 max-w-[calc(100%-38px)]">
-                  <Sparkles className="w-3 h-3 text-yellow-300 animate-pulse flex-shrink-0" />
-                  <span className="truncate">{ad.badgeText || 'Oferta Relâmpago'}</span>
-                </div>
-
-                {/* Contador circular ou botão de fechar */}
-                <div className="flex items-center flex-shrink-0">
-                  {adCountdown > 0 ? (
-                    <div 
-                      className="w-7 h-7 rounded-full bg-gray-900 text-white flex items-center justify-center text-xs font-black shadow-xs select-none border border-gray-700 flex-shrink-0"
-                      title={`Aguarde ${adCountdown}s para poder fechar`}
-                    >
-                      {adCountdown}s
-                    </div>
-                  ) : (
-                    <button
-                      onClick={handleCloseAd}
-                      title="Fechar anúncio"
-                      className="flex items-center justify-center w-7 h-7 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-700 rounded-full transition-all cursor-pointer shadow-xs active:scale-95 flex-shrink-0"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Product Image / Banner - Adaptável 100% sem cortes e sem sobreposição */}
-              {ad.imageUrl && (
-                <div className="relative w-full bg-gradient-to-b from-orange-50/20 via-white to-gray-50/40 flex items-center justify-center p-2.5 sm:p-3 border-b border-gray-100 overflow-hidden flex-shrink-0">
-                  <img 
-                    src={ad.imageUrl} 
-                    alt={ad.title} 
-                    loading="eager"
-                    decoding="async"
-                    className="w-full max-h-[140px] sm:max-h-[175px] object-contain rounded-xl drop-shadow-sm transition-transform duration-300 hover:scale-[1.02]"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-              )}
-
-              {/* Body Content */}
-              <div className="p-3 sm:p-3.5 flex flex-col gap-2.5 flex-1 overflow-y-auto min-h-0">
-                {/* Bloco de Preço & Economia */}
-                {(ad.price || ad.originalPrice) && (
-                  <div className="bg-gradient-to-r from-orange-50 via-amber-50/50 to-orange-50 px-3 py-2 rounded-xl border border-orange-200/80 shadow-xs flex flex-col gap-1 overflow-hidden">
-                    {/* Linha 1: Tag de Oferta e Selo Frete Grátis com flex-wrap para nunca vazar */}
-                    <div className="flex items-center justify-between gap-1.5 flex-wrap">
-                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-[#ee4d2d] uppercase tracking-wider">
-                        <Tag className="w-3 h-3 text-[#ee4d2d] flex-shrink-0" />
-                        <span>Preço Especial</span>
-                      </span>
-
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[9px] sm:text-[10px] font-bold rounded-md shadow-2xs">
-                        <Truck className="w-3 h-3 text-emerald-600 flex-shrink-0" />
-                        <span>Frete Grátis</span>
-                      </span>
-                    </div>
-
-                    {/* Linha 2: Valores do Preço com largura total e destaque */}
-                    <div className="flex items-baseline gap-2 flex-wrap">
-                      {ad.price && (
-                        <span className="text-xl sm:text-2xl font-black text-[#ee4d2d] tracking-tight">
-                          {ad.price}
-                        </span>
-                      )}
-                      {ad.originalPrice && (
-                        <span className="text-xs text-gray-400 font-semibold line-through">
-                          {ad.originalPrice}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Linha 3: Prova social e volume de vendas */}
-                    <div className="flex items-center gap-1 text-[10px] text-gray-500 pt-1 border-t border-orange-200/50 font-medium flex-wrap">
-                      <span className="text-amber-500 font-bold">★ 4.9</span>
-                      <span className="text-gray-500">• Mais de 1.000 vendidos</span>
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-0.5">
-                  <h3 className="text-sm sm:text-base font-bold text-gray-900 leading-snug break-words">
-                    {ad.title}
-                  </h3>
-                  {ad.description && (
-                    <p className="text-[11px] sm:text-xs text-gray-600 leading-snug break-words">
-                      {ad.description}
-                    </p>
-                  )}
-                </div>
-
-                {/* Selos de Confiança (Sem quebra de linha) */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-gray-50 border border-gray-100 text-[10px] sm:text-[11px] font-semibold text-gray-700 min-w-0">
-                    <span className="text-emerald-500 font-bold text-xs flex-shrink-0">✓</span>
-                    <span className="truncate">Em Estoque</span>
-                  </div>
-                  <div className="flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-xl bg-gray-50 border border-gray-100 text-[10px] sm:text-[11px] font-semibold text-gray-700 min-w-0">
-                    <span className="text-orange-500 font-bold text-xs flex-shrink-0">⚡</span>
-                    <span className="truncate">Envio Imediato</span>
-                  </div>
-                </div>
-
-                {/* CTA Affiliate Link Button */}
-                <a
-                  href={ad.buttonUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onPointerDown={handleAdPointerDown}
-                  onClick={handleAdCtaClick}
-                  className="w-full relative overflow-hidden py-2.5 sm:py-3 px-3 bg-gradient-to-r from-[#ee4d2d] via-[#ff5722] to-[#ee4d2d] hover:brightness-105 text-white font-black text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 shadow-md shadow-orange-500/25 transition-all select-none cursor-pointer"
-                >
-                  <AnimatePresence>
-                    {adRipples.map(ripple => (
-                      <motion.span
-                        key={ripple.id}
-                        initial={{
-                          scaleX: 0,
-                          scaleY: 0,
-                          opacity: 0.9,
-                        }}
-                        animate={{
-                          scaleX: [0, 0.45, 1],
-                          scaleY: [0, 0.65, 1],
-                          opacity: [0.9, 0.75, 0],
-                        }}
-                        exit={{ opacity: 0 }}
-                        transition={{
-                          duration: 0.55,
-                          times: [0, 0.35, 1],
-                          ease: [0.22, 1, 0.36, 1],
-                        }}
-                        onAnimationComplete={() => {
-                          setAdRipples(prev => prev.filter(r => r.id !== ripple.id));
-                        }}
-                        className="absolute pointer-events-none z-30"
-                        style={{
-                          left: ripple.x - ripple.width / 2,
-                          top: ripple.y - ripple.height / 2,
-                          width: ripple.width,
-                          height: ripple.height,
-                          borderRadius: '50%',
-                          backgroundColor: ripple.fill,
-                          border: `2px solid ${ripple.border}`,
-                          transformOrigin: 'center center',
-                        }}
-                      />
-                    ))}
-                  </AnimatePresence>
-                  <ShoppingBag className="w-4 h-4 flex-shrink-0" />
-                  <span className="leading-tight text-center truncate">{ad.buttonText || 'Aproveitar Oferta na Shopee'}</span>
-                  <ExternalLink className="w-3.5 h-3.5 flex-shrink-0 opacity-85" />
-                </a>
-
-                {/* Safe Link Disclaimer */}
-                <div className="flex items-center justify-center gap-1 text-[10px] text-gray-400">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                  <span>Link Oficial • Compra 100% Protegida</span>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {ad && (
+        <AdvertisementModal
+          ad={ad}
+          isOpen={isAdOpen}
+          onClose={handleCloseAd}
+          onAdClick={onLinkClick}
+          onTriggerCircleTransition={handleTriggerCircleTransition}
+        />
+      )}
 
       {/* Liquid Glass Loading Overlay */}
       <AnimatePresence>
