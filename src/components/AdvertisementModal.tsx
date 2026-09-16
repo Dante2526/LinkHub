@@ -150,15 +150,16 @@ export const AdvertisementModal: React.FC<AdvertisementModalProps> = React.memo(
           className="absolute inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/80 backdrop-blur-md overflow-hidden"
         >
           <motion.div
-            initial={{ scale: 0.9, opacity: 0, y: 20 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            transition={{ type: "spring", stiffness: 350, damping: 25 }}
+            role="dialog"
+            aria-modal="true"
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className="bg-white rounded-[24px] sm:rounded-[28px] overflow-hidden w-full max-w-[340px] sm:max-w-[360px] shadow-2xl relative border border-gray-100 flex flex-col my-auto max-h-[94%]"
             style={{ color: '#000', fontFamily: 'system-ui, -apple-system, sans-serif' }}
           >
             {/* Top Bar with Badge and Countdown / Close Button */}
-            <div className="flex items-center justify-between px-3.5 py-2.5 bg-gradient-to-r from-orange-50/80 via-white to-orange-50/80 border-b border-orange-100/80 flex-shrink-0 gap-2">
+            <div className="flex items-center justify-between px-3.5 py-2.5 bg-linear-to-r from-orange-50/80 via-white to-orange-50/80 border-b border-orange-100/80 flex-shrink-0 gap-2">
               <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[#ee4d2d] text-white text-[10px] sm:text-[11px] font-black rounded-full shadow-xs uppercase tracking-wider min-w-0 max-w-[calc(100%-38px)]">
                 <Sparkles className="w-3 h-3 text-yellow-300 animate-pulse flex-shrink-0" />
                 <span className="truncate">{ad.badgeText || 'Oferta Relâmpago'}</span>
@@ -186,7 +187,7 @@ export const AdvertisementModal: React.FC<AdvertisementModalProps> = React.memo(
 
             {/* Product Image / Banner */}
             {ad.imageUrl && (
-              <div className="relative w-full bg-gradient-to-b from-orange-50/20 via-white to-gray-50/40 flex items-center justify-center p-2.5 sm:p-3 border-b border-gray-100 overflow-hidden flex-shrink-0">
+              <div className="relative w-full bg-linear-to-b from-orange-50/20 via-white to-gray-50/40 flex items-center justify-center p-2.5 sm:p-3 border-b border-gray-100 overflow-hidden flex-shrink-0">
                 <img 
                   src={ad.imageUrl} 
                   alt={ad.title} 
@@ -202,7 +203,7 @@ export const AdvertisementModal: React.FC<AdvertisementModalProps> = React.memo(
             <div className="p-3 sm:p-3.5 flex flex-col gap-2.5 flex-1 overflow-y-auto min-h-0">
               {/* Bloco de Preço & Economia */}
               {(ad.price || ad.originalPrice) && (
-                <div className="bg-gradient-to-r from-orange-50 via-amber-50/50 to-orange-50 px-3 py-2 rounded-xl border border-orange-200/80 shadow-xs flex flex-col gap-1 overflow-hidden">
+                <div className="bg-linear-to-r from-orange-50 via-amber-50/50 to-orange-50 px-3 py-2 rounded-xl border border-orange-200/80 shadow-xs flex flex-col gap-1 overflow-hidden">
                   <div className="flex items-center justify-between gap-1.5 flex-wrap">
                     <span className="inline-flex items-center gap-1 text-[10px] font-black text-[#ee4d2d] uppercase tracking-wider">
                       <Tag className="w-3 h-3 text-[#ee4d2d] flex-shrink-0" />
@@ -260,12 +261,12 @@ export const AdvertisementModal: React.FC<AdvertisementModalProps> = React.memo(
 
               {/* CTA Affiliate Link Button */}
               <a
-                href={ad.buttonUrl}
+                href={sanitizeUrl(ad.buttonUrl || '') || '#'}
                 target="_blank"
                 rel="noopener noreferrer"
                 onPointerDown={handleAdPointerDown}
                 onClick={handleAdCtaClick}
-                className="w-full relative overflow-hidden py-2.5 sm:py-3 px-3 bg-gradient-to-r from-[#ee4d2d] via-[#ff5722] to-[#ee4d2d] hover:brightness-105 text-white font-black text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 shadow-md shadow-orange-500/25 transition-all select-none cursor-pointer"
+                className="w-full relative overflow-hidden py-2.5 sm:py-3 px-3 bg-linear-to-r from-[#ee4d2d] via-[#ff5722] to-[#ee4d2d] hover:brightness-105 text-white font-black text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 shadow-md shadow-orange-500/25 transition-all select-none cursor-pointer"
               >
                 <AnimatePresence>
                   {adRipples.map(ripple => (

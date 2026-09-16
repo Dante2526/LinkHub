@@ -39,7 +39,7 @@ export const LinkItemEditorRow: React.FC<LinkItemEditorRowProps> = React.memo(({
       dragListener={false}
       dragControls={dragControls}
       whileDrag={{ scale: 1.01, zIndex: 40, boxShadow: '0 12px 30px -4px rgba(0,0,0,0.6)' }}
-      className="bg-gray-800/95 backdrop-blur-sm rounded-3xl py-5 px-10 sm:px-12 shadow-md border border-gray-700/60 relative transition-all flex justify-center group/card"
+      className="bg-gray-800/95 rounded-3xl py-5 px-10 sm:px-12 shadow-md border border-gray-700/60 relative transition-all flex justify-center group/card"
     >
       {/* Drag & Move Handles */}
       <div className="absolute left-1.5 sm:left-3.5 top-0 bottom-0 flex flex-col items-center justify-center gap-1.5 text-gray-500 w-8 select-none">
@@ -52,13 +52,15 @@ export const LinkItemEditorRow: React.FC<LinkItemEditorRowProps> = React.memo(({
         >
           ▲
         </button>
-        <div
+        <button
+          type="button"
           onPointerDown={(e) => dragControls.start(e)}
           className="cursor-grab active:cursor-grabbing p-1.5 rounded-xl hover:bg-gray-700/80 hover:text-white transition-all touch-none"
           title="Segure e arraste para reordenar"
+          aria-roledescription="Botão de arrastar"
         >
           <GripVertical className="w-5 h-5 opacity-60 group-hover/card:opacity-90 hover:!opacity-100 mx-auto" />
-        </div>
+        </button>
         <button
           type="button"
           onClick={() => moveLink(index, 'down')}
@@ -72,7 +74,9 @@ export const LinkItemEditorRow: React.FC<LinkItemEditorRowProps> = React.memo(({
 
       <div className="w-full space-y-3.5">
         <div>
+          <label htmlFor={`title-${link.id}`} className="sr-only">Título do Link</label>
           <input
+            id={`title-${link.id}`}
             type="text"
             value={link.title}
             onChange={(e) => updateLink(link.id, 'title', e.target.value)}
@@ -81,7 +85,9 @@ export const LinkItemEditorRow: React.FC<LinkItemEditorRowProps> = React.memo(({
           />
         </div>
         <div>
+          <label htmlFor={`desc-${link.id}`} className="sr-only">Descrição (opcional)</label>
           <input
+            id={`desc-${link.id}`}
             type="text"
             value={link.description || ''}
             onChange={(e) => updateLink(link.id, 'description', e.target.value)}
@@ -90,7 +96,9 @@ export const LinkItemEditorRow: React.FC<LinkItemEditorRowProps> = React.memo(({
           />
         </div>
         <div>
+          <label htmlFor={`url-${link.id}`} className="sr-only">URL (https://...)</label>
           <input
+            id={`url-${link.id}`}
             type="url"
             value={link.url}
             onChange={(e) => updateLink(link.id, 'url', e.target.value)}
@@ -101,19 +109,26 @@ export const LinkItemEditorRow: React.FC<LinkItemEditorRowProps> = React.memo(({
 
         {/* Thumbnail URL and Local Upload */}
         <div className="flex gap-2 justify-center relative">
-          <label
-            className="absolute left-0 cursor-pointer w-11 h-11 bg-gray-900/70 hover:bg-gray-700 rounded-xl flex items-center justify-center transition-colors border border-gray-700/40"
-            title="Anexar Imagem"
-          >
-            <ImageIcon className="w-5 h-5 text-gray-400 hover:text-white transition-colors" />
+          <div className="absolute left-0 w-11 h-11">
+            <button
+              type="button"
+              onClick={() => document.getElementById(`file-${link.id}`)?.click()}
+              className="cursor-pointer w-11 h-11 bg-gray-900/70 hover:bg-gray-700 rounded-xl flex items-center justify-center transition-colors border border-gray-700/40"
+              title="Anexar Imagem"
+            >
+              <ImageIcon className="w-5 h-5 text-gray-400 hover:text-white transition-colors" />
+            </button>
             <input
+              id={`file-${link.id}`}
               type="file"
               accept="image/*"
               onChange={(e) => handleFileUpload(e, 'image', 'linkThumb', link.id)}
-              className="hidden"
+              className="sr-only"
             />
-          </label>
+          </div>
+          <label htmlFor={`thumbUrl-${link.id}`} className="sr-only">URL do Ícone ou anexe uma imagem</label>
           <input
+            id={`thumbUrl-${link.id}`}
             type="url"
             value={link.thumbnailUrl || ''}
             onChange={(e) => updateLink(link.id, 'thumbnailUrl', e.target.value)}
@@ -253,15 +268,17 @@ export const LinkItemEditorRow: React.FC<LinkItemEditorRowProps> = React.memo(({
 
         {/* Visibility and Remove */}
         <div className="flex items-center justify-between pt-3 px-1 relative border-t border-gray-700/40">
-          <label className="flex items-center gap-3 cursor-pointer group">
+          <label htmlFor={`visibility-${link.id}`} className="flex items-center gap-3 cursor-pointer group">
             <div className={`w-10 h-6 rounded-full p-1 transition-colors ${link.isVisible ? 'bg-blue-600' : 'bg-gray-700'}`}>
               <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${link.isVisible ? 'translate-x-4' : 'translate-x-0'}`} />
             </div>
             <input
+              id={`visibility-${link.id}`}
               type="checkbox"
+              role="switch"
               checked={link.isVisible}
               onChange={(e) => updateLink(link.id, 'isVisible', e.target.checked)}
-              className="hidden"
+              className="sr-only"
             />
             <span className="text-sm font-semibold text-gray-300">Visível</span>
           </label>

@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, ArrowRight, ShieldCheck, AlertCircle, Loader2, Lock } from 'lucide-react';
-import { db, isFirebaseConfigured } from '../lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
-
+import { Mail, ArrowRight, AlertCircle, Loader2, Lock } from 'lucide-react';
 interface LoginProps {
   onLogin: (email: string) => void;
 }
@@ -45,7 +42,7 @@ export function Login({ onLogin }: LoginProps) {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
         <div className="flex justify-center">
-          <div className="w-14 h-14 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+          <div className="w-14 h-14 bg-linear-to-tr from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/25">
             <Lock className="w-7 h-7 text-white" />
           </div>
         </div>

@@ -75,12 +75,52 @@ export const ColorPicker = React.memo(function ColorPicker({
       calculatePosition();
     }
 
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+        triggerRef.current?.focus();
+      }
+      
+      if (e.key === 'Tab') {
+        if (!popoverRef.current) return;
+        
+        const focusableElements = popoverRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"]), .react-colorful__interactive'
+        );
+        
+        if (focusableElements.length === 0) return;
+        
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
+      }
+    };
+
     window.addEventListener('resize', handleScrollOrResize);
     window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('keydown', handleKeyDown);
+
+    // Foca no primeiro elemento focável ao abrir
+    if (popoverRef.current) {
+      const closeBtn = popoverRef.current.querySelector('button');
+      if (closeBtn) closeBtn.focus();
+    }
 
     return () => {
       window.removeEventListener('resize', handleScrollOrResize);
       window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen, calculatePosition]);
 

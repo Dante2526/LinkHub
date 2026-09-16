@@ -16,7 +16,7 @@ interface FullscreenCircleTransitionProps {
   onFinished?: () => void;
 }
 
-export const FullscreenCircleTransition: React.FC<FullscreenCircleTransitionProps> = ({
+const FullscreenCircleTransition: React.FC<FullscreenCircleTransitionProps> = ({
   transitionData,
   containerRef,
   onReadyToNavigate,

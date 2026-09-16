@@ -1,68 +1,14 @@
-import React, { useState, useEffect, useCallback, useRef, Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
-import { 
-  doc, 
-  onSnapshot, 
-  setDoc, 
-  collection, 
-  addDoc, 
-  deleteDoc, 
-  getDoc, 
-  writeBatch 
-} from 'firebase/firestore';
-import { db, isFirebaseConfigured } from './lib/firebase';
-import { AppData, defaultTheme, defaultProfile, defaultLinks, defaultAd, BackgroundPosition, LinkItem, Theme, Profile, Advertisement } from './types';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AppData, BackgroundPosition } from './types';
 import { Preview } from './components/Preview';
 import { Smartphone, Monitor, ExternalLink, Loader2, LogOut } from 'lucide-react';
-import { checkIsAdminAuthorized } from './lib/auth';
+import { useAuth } from './hooks/useAuth';
+import { useMetrics } from './hooks/useMetrics';
+import { useLinkHubData } from './hooks/useLinkHubData';
 
 const LazyEditor = lazy(() => import('./components/Editor').then(m => ({ default: m.Editor })));
 const LazyLogin = lazy(() => import('./components/Login').then(m => ({ default: m.Login })));
-
-const STORAGE_KEY = 'link-organizer-data';
-const CACHE_KEY = 'linkhub_cached_profile';
-
-const getInitialData = (): AppData | null => {
-  try {
-    // 1. Limpeza proativa de chaves legadas e resíduos no navegador
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem('linkhub_profile_version');
-    } catch (e) {}
-
-    let raw = localStorage.getItem(CACHE_KEY);
-
-    if (raw) {
-      const parsed = JSON.parse(raw);
-
-      if (!Array.isArray(parsed.links)) {
-        parsed.links = [];
-      } else {
-        // Blindagem: descarta quaisquer links de exemplo do template antigo que possam estar em cache local
-        parsed.links = parsed.links.filter((l: any) => l.title !== 'Meu Canal no YouTube');
-      }
-
-      if (parsed?.theme) {
-        if (!parsed.theme.profileTextColor) parsed.theme.profileTextColor = '#ffffff';
-        if (!parsed.theme.linkTextAlign) parsed.theme.linkTextAlign = 'center';
-        if (!parsed.theme.backgroundPositionMobile) parsed.theme.backgroundPositionMobile = { x: 50, y: 50 };
-        if (!parsed.theme.backgroundPositionDesktop) parsed.theme.backgroundPositionDesktop = { x: 50, y: 50 };
-        if (parsed.theme.backgroundGradient && parsed.theme.backgroundGradient.includes('#ff9a9e')) {
-          parsed.theme.backgroundGradient = 'linear-gradient(135deg, #18181b 0%, #09090b 100%)';
-        }
-      }
-      if (!parsed.ad) {
-        parsed.ad = { ...defaultAd };
-      } else {
-        parsed.ad = { ...defaultAd, ...parsed.ad };
-      }
-      return parsed;
-    }
-  } catch (e) {
-    console.error('Erro ao ler cache local', e);
-  }
-  return null;
-};
 
 const MemoizedEditor = React.memo(LazyEditor);
 const MemoizedPreview = React.memo(Preview);
@@ -132,7 +78,7 @@ function AdminView({
                 type="button"
                 onClick={onLogout}
                 title="Sair do painel administrativo"
-                className="flex items-center gap-1.5 px-3 py-2 bg-gray-800 hover:bg-red-500/10 text-gray-600 hover:text-red-400 rounded-full text-xs font-semibold transition-all border border-gray-700 hover:border-red-500/20 cursor-pointer shadow-xs"
+                className="flex items-center gap-1.5 px-3 py-2 bg-gray-800 hover:bg-red-500/10 text-gray-300 hover:text-red-400 rounded-full text-xs font-semibold transition-all border border-gray-700 hover:border-red-500/20 cursor-pointer shadow-xs"
               >
                 <LogOut className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Sair</span>
@@ -167,7 +113,7 @@ function AdminView({
           <div className="md:hidden h-16 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-4 flex-shrink-0">
             <button 
               onClick={() => setShowMobilePreview(false)}
-              className="px-4 py-2 text-sm font-semibold text-gray-600 bg-gray-900/60 rounded-full hover:bg-gray-700 transition-colors"
+              className="px-4 py-2 text-sm font-semibold text-gray-300 hover:text-white bg-gray-900/60 rounded-full hover:bg-gray-700 transition-colors"
             >
               Voltar ao Editor
             </button>
@@ -211,7 +157,7 @@ function AdminView({
               <div className="absolute -right-[3.5px] top-[162px] w-[3.5px] h-[72px] bg-neutral-600/90 rounded-r-sm shadow-xs pointer-events-none" />
 
               {/* Chassi Titânio com Chanfro, Brilho Metálico e Sombra Profunda */}
-              <div className="w-full h-full p-[3.5px] rounded-[52px] bg-gradient-to-b from-[#52565e] via-[#2f333a] to-[#1a1c20] shadow-[0_25px_60px_-12px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.12),inset_0_1px_1px_rgba(255,255,255,0.35)] flex flex-col">
+              <div className="w-full h-full p-[3.5px] rounded-[52px] bg-linear-to-b from-[#52565e] via-[#2f333a] to-[#1a1c20] shadow-[0_25px_60px_-12px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.12),inset_0_1px_1px_rgba(255,255,255,0.35)] flex flex-col">
                 {/* Borda interna OLED ultrafina e display */}
                 <div className="w-full h-full p-[7px] bg-black rounded-[48.5px] ring-1 ring-white/10 relative overflow-hidden flex flex-col">
                   {/* Superfície de Vidro da Tela */}
@@ -304,6 +250,7 @@ function PublicView({ data, onLinkClick, onView }: { data: AppData, onLinkClick:
         e.stopPropagation();
         return false;
       }
+      return true;
     };
 
     const handleContextMenu = (e: MouseEvent) => {
@@ -327,355 +274,11 @@ function PublicView({ data, onLinkClick, onView }: { data: AppData, onLinkClick:
 }
 
 export default function App() {
-  const [data, setData] = useState<AppData | null>(getInitialData);
-  const [loading, setLoading] = useState<boolean>(() => !getInitialData());
-  const [adminEmail, setAdminEmail] = useState<string | null>(localStorage.getItem('linkhub_admin_email'));
-  
-  const profileTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const themeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const adTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const linksTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    document.title = 'LinkHub';
-    return () => {
-      if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current);
-      if (themeTimeoutRef.current) clearTimeout(themeTimeoutRef.current);
-      if (adTimeoutRef.current) clearTimeout(adTimeoutRef.current);
-      if (linksTimeoutRef.current) clearTimeout(linksTimeoutRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isFirebaseConfigured) {
-      if (!data) {
-        const defaultData = getInitialData() || { profile: defaultProfile, theme: defaultTheme, links: [], ad: defaultAd };
-        setData(defaultData);
-      }
-      setLoading(false);
-      return;
-    }
-
-    const loaded = { profile: false, theme: false, links: false, ad: false };
-    const checkAllLoaded = () => {
-      if (loaded.profile && loaded.theme && loaded.links && loaded.ad) {
-        setLoading(false);
-      }
-    };
-
-    // Timeout de segurança absoluto: no máximo 2s de tela de loading
-    const safetyTimer = setTimeout(() => {
-      setLoading(false);
-    }, 5000);
-
-    // 1. Migração automática: se perfis/principal ainda existir, migra para as 4 coleções e exclui o antigo
-    const runMigrationIfNeeded = async () => {
-      try {
-        const legacyDocRef = doc(db, 'perfis', 'principal');
-        const legacySnap = await getDoc(legacyDocRef);
-        if (legacySnap.exists()) {
-          const legacyData = legacySnap.data() as AppData;
-          console.log('[Migração LinkHub] Migrando documento antigo perfis/principal para arquitetura modular...');
-
-          if (legacyData.profile) {
-            await setDoc(doc(db, 'perfil', 'principal'), {
-              ...legacyData.profile,
-              updatedAt: Date.now()
-            }, { merge: true });
-          }
-
-          if (legacyData.theme) {
-            await setDoc(doc(db, 'temas', 'principal'), {
-              ...legacyData.theme,
-              updatedAt: Date.now()
-            }, { merge: true });
-          }
-
-          if (legacyData.ad) {
-            await setDoc(doc(db, 'anuncios', 'principal'), {
-              ...legacyData.ad,
-              updatedAt: Date.now()
-            }, { merge: true });
-          }
-
-          if (Array.isArray(legacyData.links) && legacyData.links.length > 0) {
-            const realLinks = legacyData.links.filter(l => l.title !== 'Meu Canal no YouTube');
-            if (realLinks.length > 0) {
-              const batch = writeBatch(db);
-              realLinks.forEach((link, idx) => {
-                if (link.id) {
-                  batch.set(doc(db, 'links', link.id), {
-                    ...link,
-                    order: idx,
-                    updatedAt: Date.now()
-                  });
-                }
-              });
-              await batch.commit();
-            }
-          }
-
-          await deleteDoc(legacyDocRef);
-          console.log('[Migração LinkHub] Documento legado perfis/principal excluído com sucesso!');
-        }
-      } catch (err) {
-        console.error('[Migração LinkHub] Erro na migração de dados legados:', err);
-      }
-    };
-
-    runMigrationIfNeeded();
-
-    // 2. Escuta Perfil (perfil/principal)
-    const unsubProfile = onSnapshot(doc(db, 'perfil', 'principal'), (snap) => {
-      let profile: Profile;
-      if (snap.exists()) {
-        profile = snap.data() as Profile;
-      } else {
-        const local = getInitialData()?.profile;
-        profile = local || defaultProfile;
-        setDoc(doc(db, 'perfil', 'principal'), { ...profile, updatedAt: Date.now() }).catch(console.error);
-      }
-      setData(prev => ({
-        profile,
-        theme: prev?.theme || getInitialData()?.theme || defaultTheme,
-        links: prev?.links || getInitialData()?.links || [],
-        ad: prev?.ad || getInitialData()?.ad || defaultAd,
-        updatedAt: Date.now()
-      }));
-      loaded.profile = true;
-      checkAllLoaded();
-    }, (err) => {
-      console.error('Erro ao ler perfil:', err);
-      loaded.profile = true;
-      checkAllLoaded();
-    });
-
-    // 3. Escuta Tema (temas/principal)
-    const unsubTheme = onSnapshot(doc(db, 'temas', 'principal'), (snap) => {
-      let theme: Theme;
-      if (snap.exists()) {
-        const raw = snap.data() as Theme;
-        theme = { ...defaultTheme, ...raw };
-        if (!theme.profileTextColor) theme.profileTextColor = '#ffffff';
-        if (!theme.linkTextAlign) theme.linkTextAlign = 'center';
-        if (!theme.backgroundPositionMobile) theme.backgroundPositionMobile = { x: 50, y: 50 };
-        if (!theme.backgroundPositionDesktop) theme.backgroundPositionDesktop = { x: 50, y: 50 };
-      } else {
-        const local = getInitialData()?.theme;
-        theme = local || defaultTheme;
-        setDoc(doc(db, 'temas', 'principal'), { ...theme, updatedAt: Date.now() }).catch(console.error);
-      }
-      setData(prev => ({
-        profile: prev?.profile || getInitialData()?.profile || defaultProfile,
-        theme,
-        links: prev?.links || getInitialData()?.links || [],
-        ad: prev?.ad || getInitialData()?.ad || defaultAd,
-        updatedAt: Date.now()
-      }));
-      loaded.theme = true;
-      checkAllLoaded();
-    }, (err) => {
-      console.error('Erro ao ler tema:', err);
-      loaded.theme = true;
-      checkAllLoaded();
-    });
-
-    // 4. Escuta Anúncios (anuncios/principal)
-    const unsubAd = onSnapshot(doc(db, 'anuncios', 'principal'), (snap) => {
-      let ad: Advertisement;
-      if (snap.exists()) {
-        ad = { ...defaultAd, ...snap.data() as Advertisement };
-      } else {
-        const local = getInitialData()?.ad;
-        ad = local || defaultAd;
-        setDoc(doc(db, 'anuncios', 'principal'), { ...ad, updatedAt: Date.now() }).catch(console.error);
-      }
-      setData(prev => ({
-        profile: prev?.profile || getInitialData()?.profile || defaultProfile,
-        theme: prev?.theme || getInitialData()?.theme || defaultTheme,
-        links: prev?.links || getInitialData()?.links || [],
-        ad,
-        updatedAt: Date.now()
-      }));
-      loaded.ad = true;
-      checkAllLoaded();
-    }, (err) => {
-      console.error('Erro ao ler anúncios:', err);
-      loaded.ad = true;
-      checkAllLoaded();
-    });
-
-    // 5. Escuta Coleção Links (/links)
-    const unsubLinks = onSnapshot(collection(db, 'links'), (snap) => {
-      const items: (LinkItem & { order?: number })[] = [];
-      snap.forEach(d => {
-        items.push({ ...d.data(), id: d.id } as LinkItem & { order?: number });
-      });
-      items.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-      const finalLinks: LinkItem[] = items.map(({ order, ...rest }) => rest as LinkItem);
-
-      setData(prev => {
-        const currentProfile = prev?.profile || getInitialData()?.profile || defaultProfile;
-        const currentTheme = prev?.theme || getInitialData()?.theme || defaultTheme;
-        const currentAd = prev?.ad || getInitialData()?.ad || defaultAd;
-        const updated: AppData = {
-          profile: currentProfile,
-          theme: currentTheme,
-          links: finalLinks,
-          ad: currentAd,
-          updatedAt: Date.now()
-        };
-        try {
-          localStorage.setItem(CACHE_KEY, JSON.stringify(updated));
-        } catch (e) {}
-        return updated;
-      });
-      loaded.links = true;
-      checkAllLoaded();
-    }, (err) => {
-      console.error('Erro ao ler links:', err);
-      loaded.links = true;
-      checkAllLoaded();
-    });
-
-    return () => {
-      clearTimeout(safetyTimer);
-      unsubProfile();
-      unsubTheme();
-      unsubAd();
-      unsubLinks();
-    };
-  }, []);
-
-  const handleUpdateData = useCallback((updater: AppData | ((prev: AppData) => AppData)) => {
-    setData(prev => {
-      if (!prev) return prev;
-      const raw = typeof updater === 'function' ? updater(prev) : updater;
-      const now = Date.now();
-      const newData: AppData = {
-        ...raw,
-        updatedAt: now,
-      };
-      
-      // Atualização imediata no cache do navegador (60 FPS na UI)
-      try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify(newData));
-      } catch (e) {}
-
-      if (!isFirebaseConfigured) return newData;
-
-      // 1. Gravação Isolada de Perfil
-      if (JSON.stringify(prev.profile) !== JSON.stringify(newData.profile)) {
-        if (profileTimeoutRef.current) clearTimeout(profileTimeoutRef.current);
-        profileTimeoutRef.current = setTimeout(() => {
-          setDoc(doc(db, 'perfil', 'principal'), { ...newData.profile, updatedAt: now }, { merge: true }).catch(console.error);
-        }, 300);
-      }
-
-      // 2. Gravação Isolada de Tema
-      if (JSON.stringify(prev.theme) !== JSON.stringify(newData.theme)) {
-        if (themeTimeoutRef.current) clearTimeout(themeTimeoutRef.current);
-        themeTimeoutRef.current = setTimeout(() => {
-          setDoc(doc(db, 'temas', 'principal'), { ...newData.theme, updatedAt: now }, { merge: true }).catch(console.error);
-        }, 300);
-      }
-
-      // 3. Gravação Isolada de Anúncio
-      if (JSON.stringify(prev.ad) !== JSON.stringify(newData.ad)) {
-        if (adTimeoutRef.current) clearTimeout(adTimeoutRef.current);
-        adTimeoutRef.current = setTimeout(() => {
-          if (newData.ad) {
-            setDoc(doc(db, 'anuncios', 'principal'), { ...newData.ad, updatedAt: now }, { merge: true }).catch(console.error);
-          }
-        }, 300);
-      }
-
-      // 4. Gravação Isolada de Links (Coleção /links com Batch)
-      if (JSON.stringify(prev.links) !== JSON.stringify(newData.links)) {
-        if (linksTimeoutRef.current) clearTimeout(linksTimeoutRef.current);
-        linksTimeoutRef.current = setTimeout(async () => {
-          try {
-            const batch = writeBatch(db);
-            const currentLinkIds = new Set(newData.links.map(l => l.id));
-
-            // Salva / atualiza cada link com sua nova ordem
-            newData.links.forEach((link, idx) => {
-              if (link.id) {
-                batch.set(doc(db, 'links', link.id), {
-                  ...link,
-                  order: idx,
-                  updatedAt: now,
-                });
-              }
-            });
-
-            // Remove do Firestore os links deletados
-            const prevLinks = prev.links || [];
-            prevLinks.forEach(oldLink => {
-              if (oldLink.id && !currentLinkIds.has(oldLink.id)) {
-                batch.delete(doc(db, 'links', oldLink.id));
-              }
-            });
-
-            await batch.commit();
-          } catch (err) {
-            console.error('Erro ao sincronizar links com Firestore:', err);
-          }
-        }, 300);
-      }
-
-      return newData;
-    });
-  }, []);
-
-  const handleLinkClick = useCallback((linkId: string) => {
-    if (isFirebaseConfigured) {
-      if (linkId === '__advertisement__') {
-        addDoc(collection(db, 'cliques'), { 
-          linkId: '__advertisement__', 
-          isAd: true, 
-          title: data?.ad?.title || 'Oferta Shopee', 
-          time: Date.now() 
-        }).catch(console.error);
-      } else {
-        addDoc(collection(db, 'cliques'), { linkId, time: Date.now() }).catch(console.error);
-      }
-    }
-  }, [data?.ad?.title]);
-
-  const handleView = useCallback(() => {
-    const hasViewed = sessionStorage.getItem('linkhub_has_viewed');
-    if (!hasViewed) {
-      if (isFirebaseConfigured) {
-        addDoc(collection(db, 'visualizacoes'), { time: Date.now() }).catch(console.error);
-      }
-      sessionStorage.setItem('linkhub_has_viewed', 'true');
-    }
-  }, []);
+  const { data, loading, handleUpdateData } = useLinkHubData();
+  const { adminEmail, handleLogin, handleLogout } = useAuth();
+  const { handleLinkClick, handleView } = useMetrics(data?.ad);
 
   const isAdminDomain = window.location.hostname.includes('-adm');
-
-  const handleLogout = useCallback(() => {
-    localStorage.removeItem('linkhub_admin_email');
-    setAdminEmail(null);
-  }, []);
-
-  // Revalida se o e-mail ativo ainda consta na coleção 'administradores' no Firestore
-  useEffect(() => {
-    if (adminEmail && isFirebaseConfigured) {
-      checkIsAdminAuthorized(adminEmail).then(res => {
-        if (!res.authorized) {
-          console.warn('Sessão administrativa expirada ou revogada no Firebase:', res.reason);
-          handleLogout();
-        }
-      }).catch(console.error);
-    }
-  }, [adminEmail, handleLogout]);
-
-  const handleLogin = (email: string) => {
-    localStorage.setItem('linkhub_admin_email', email);
-    setAdminEmail(email);
-  };
 
   const renderAdmin = () => {
     if (!adminEmail) {
@@ -689,6 +292,7 @@ export default function App() {
         </Suspense>
       );
     }
+    if (!data) return null;
     return (
       <AdminView 
         data={data} 
@@ -704,7 +308,7 @@ export default function App() {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-gray-900 text-white">
         <div className="flex flex-col items-center gap-4 animate-pulse">
-          <div className="w-10 h-10 rounded-full border-3 border-blue-500 border-t-transparent animate-spin"></div>
+          <div className="w-10 h-10 rounded-full border-[3px] border-blue-500 border-t-transparent animate-spin"></div>
           <p className="text-gray-500 text-sm font-medium tracking-wide">Carregando perfil...</p>
         </div>
       </div>

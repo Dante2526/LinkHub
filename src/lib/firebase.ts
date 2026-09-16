@@ -20,7 +20,7 @@ const firebaseConfig = isFirebaseConfigured ? {
   appId: import.meta.env.VITE_FIREBASE_APP_ID?.trim() || '1:123456789012:web:abcdef123456'
 } : null;
 
-export const app = firebaseConfig ? (getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)) : null as any;
-export const db = app ? getFirestore(app) : null as any;
-export const storage = app ? getStorage(app) : null as any;
+export const app = firebaseConfig ? (getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)) : null;
+export const db = app ? getFirestore(app) : null;
+export const storage = app ? getStorage(app) : null;
 

@@ -1,29 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AppData, LinkItem, Theme, Advertisement, defaultAd, BackgroundPosition, ThumbnailShape } from '../types';
-import { GripVertical, Plus, Trash2, Image as ImageIcon, Video, Palette, Link as LinkIcon, User, Camera, BarChart3, MousePointerClick, Clock, Calendar, Eye, Loader2, Upload, ShoppingBag, Megaphone, Sparkles, ExternalLink, Play, Tag, Timer, CheckCircle2, Move, Smartphone, Monitor } from 'lucide-react';
+import { AppData, LinkItem, Theme, Advertisement, defaultAd, BackgroundPosition } from '../types';
+import { Plus, Trash2, Image as ImageIcon, Palette, Link as LinkIcon, User, Camera, BarChart3, MousePointerClick, Clock, Calendar, Eye, Loader2, Upload, ShoppingBag, Sparkles, ExternalLink, Play, Tag, Timer, Move } from 'lucide-react';
 import { ColorPicker } from './ColorPicker';
 import { CustomSelect, SelectOption } from './CustomSelect';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { collection, getCountFromServer, getDocs, query, orderBy, limit, setDoc, doc, where } from 'firebase/firestore';
-import { db, storage, isFirebaseConfigured } from '../lib/firebase';
+import { collection, getDocs, query, where, doc, writeBatch, getCountFromServer, orderBy, limit } from 'firebase/firestore';
+import { db, isFirebaseConfigured } from '../lib/firebase';
 import { sanitizeUrl } from '../lib/sanitize';
 import { Reorder } from 'framer-motion';
 import { LinkItemEditorRow } from './LinkItemEditorRow';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile } from '@ffmpeg/util';
-
-const uploadToStorage = async (file: File | Blob, path: string, onProgress?: (pct: number) => void): Promise<string> => {
-  if (!storage) throw new Error("Firebase Storage is not initialized.");
-  const storageRef = ref(storage, path);
-  const task = uploadBytesResumable(storageRef, file, { contentType: file.type || 'application/octet-stream' });
-  return new Promise((resolve, reject) => {
-    task.on('state_changed',
-      (snap) => onProgress?.(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
-      reject,
-      async () => resolve(await getDownloadURL(task.snapshot.ref))
-    );
-  });
-};
 
 const BACKGROUND_TYPE_OPTIONS: SelectOption[] = [
   { value: 'color', label: 'Cor Sólida', subtitle: 'Cor única de fundo' },
@@ -162,20 +148,7 @@ export const Editor: React.FC<EditorProps> = ({
   };
 
   const handleAdImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadingState(prev => ({ ...prev, adImage: true }));
-    try {
-      const compressedDataUrl = await compressImageToDataUrl(file, 800, 0.8);
-      const resolvedUrl = compressedDataUrl || URL.createObjectURL(file);
-      updateAd('imageUrl', resolvedUrl);
-    } catch (err) {
-      console.error("Erro ao subir foto do produto para o anúncio", err);
-    } finally {
-      if (e.target) e.target.value = '';
-      setUploadingState(prev => ({ ...prev, adImage: false }));
-    }
+    return handleFileUpload(e, 'image', 'adImage');
   };
 
   const triggerAdPreview = () => {
@@ -266,6 +239,7 @@ export const Editor: React.FC<EditorProps> = ({
           setLoadingMetrics(false);
           return;
         }
+        if (!db) return;
         try {
           const viewsSnap = await getCountFromServer(collection(db, 'visualizacoes'));
           const clicksSnap = await getCountFromServer(collection(db, 'cliques'));
@@ -358,7 +332,7 @@ export const Editor: React.FC<EditorProps> = ({
 
   const addLink = () => {
     const newLink: LinkItem = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       title: 'Novo Link',
       url: '',
       thumbnailUrl: '',
@@ -380,15 +354,9 @@ export const Editor: React.FC<EditorProps> = ({
     video: ['video/mp4', 'video/webm', 'image/gif'],
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video', targetField: keyof Theme | keyof AppData['profile'] | 'linkThumb', linkId?: string) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video', targetField: keyof Theme | keyof AppData['profile'] | 'linkThumb' | 'adImage', linkId?: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (!isFirebaseConfigured) {
-      alert("O Firebase não está configurado. O upload de arquivos para a nuvem está desativado.");
-      e.target.value = '';
-      return;
-    }
 
     if (!ALLOWED_MIME[type].includes(file.type)) {
       alert(`Tipo não permitido: ${file.type || 'desconhecido'}`);
@@ -410,22 +378,17 @@ export const Editor: React.FC<EditorProps> = ({
         // Converte e comprime a imagem localmente de forma instantânea
         const maxDimension = targetField === 'avatarUrl' ? 256 : targetField === 'linkThumb' ? 200 : 1000;
         const compressedDataUrl = await compressImageToDataUrl(file, maxDimension, 0.75);
-        
-        // Converter dataUrl para Blob
-        const response = await fetch(compressedDataUrl);
-        const blob = await response.blob();
-        
-        // Fazer upload para o Firebase Storage
-        const path = `users/images/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-        const url = await uploadToStorage(blob, path, (pct) => setUploadProgress(prev => ({ ...prev, [uploadKey]: pct })));
+        const resolvedUrl = compressedDataUrl || URL.createObjectURL(file);
 
-        // Aplica a URL pública
+        // Aplica imediatamente e persiste via Firestore/LocalStorage no App.tsx
         if (targetField === 'avatarUrl') {
-          updateProfile('avatarUrl', url);
+          updateProfile('avatarUrl', resolvedUrl);
         } else if (targetField === 'linkThumb' && linkId) {
-          updateLink(linkId, 'thumbnailUrl', url);
+          updateLink(linkId, 'thumbnailUrl', resolvedUrl);
+        } else if (targetField === 'adImage') {
+          updateAd('imageUrl', resolvedUrl);
         } else {
-          updateTheme(targetField as keyof Theme, url);
+          updateTheme(targetField as keyof Theme, resolvedUrl);
         }
       } else if (type === 'video') {
         let videoFileToUpload = file;
@@ -470,10 +433,45 @@ export const Editor: React.FC<EditorProps> = ({
           }
         }
 
-        // Upload do vídeo para o Firebase Storage
-        const path = `users/videos/${Date.now()}_${Math.random().toString(36).substring(7)}.webm`;
-        const url = await uploadToStorage(videoFileToUpload, path, (pct) => setUploadProgress(prev => ({ ...prev, [uploadKey]: pct })));
+        // Quebra em chunks no Firestore para vídeos
+        const base64String = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(videoFileToUpload);
+        });
+
+        // Base64 tem ~33% overhead: 600KB de chars → ~450KB de binário real → seguro abaixo de 1MB por doc
+        const chunkSize = 600 * 1024;
+        const totalChunks = Math.ceil(base64String.length / chunkSize);
+        const fileId = `vid_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+
+        if (!db) throw new Error('Firestore not initialized');
+        const batch = writeBatch(db);
+        for (let i = 0; i < totalChunks; i++) {
+          const chunkData = base64String.slice(i * chunkSize, (i + 1) * chunkSize);
+          batch.set(doc(db, 'media_chunks', `${fileId}_chunk_${i}`), {
+            data: chunkData,
+            index: i,
+            fileId: fileId
+          });
+        }
         
+        try {
+          await batch.commit();
+          setUploadProgress(prev => ({ ...prev, [uploadKey]: 100 }));
+        } catch (err) {
+          // Cleanup em caso de erro no batch
+          if (!db) throw new Error('Firestore not initialized');
+          const delBatch = writeBatch(db);
+          for (let i = 0; i < totalChunks; i++) {
+            delBatch.delete(doc(db, 'media_chunks', `${fileId}_chunk_${i}`));
+          }
+          await delBatch.commit().catch(() => {});
+          throw new Error('Falha no batch upload de vídeo');
+        }
+        
+        const url = `firestore_chunked|${fileId}|${totalChunks}`;
         updateTheme(targetField as keyof Theme, url);
       }
     } catch (err) {
@@ -507,9 +505,12 @@ export const Editor: React.FC<EditorProps> = ({
     <div className="w-full h-full flex flex-col">
       {/* Tabs */}
       <div className="px-6 pb-2">
-        <div className="flex bg-gray-900/90 border border-gray-800 p-1.5 rounded-2xl gap-1.5 overflow-x-auto no-scrollbar shadow-inner">
+        <div role="tablist" className="flex bg-gray-900/90 border border-gray-800 p-1.5 rounded-2xl gap-1.5 overflow-x-auto no-scrollbar shadow-inner">
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'links'}
+            aria-controls="panel-links"
             onClick={() => setActiveTab('links')}
             className={`flex-1 py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-xs whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'links' 
@@ -522,6 +523,9 @@ export const Editor: React.FC<EditorProps> = ({
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'profile'}
+            aria-controls="panel-profile"
             onClick={() => setActiveTab('profile')}
             className={`flex-1 py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-xs whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'profile' 
@@ -534,6 +538,9 @@ export const Editor: React.FC<EditorProps> = ({
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'theme'}
+            aria-controls="panel-theme"
             onClick={() => setActiveTab('theme')}
             className={`flex-1 py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-xs whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'theme' 
@@ -546,6 +553,9 @@ export const Editor: React.FC<EditorProps> = ({
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'ad'}
+            aria-controls="panel-ad"
             onClick={() => setActiveTab('ad')}
             className={`flex-1 py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-xs whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'ad' 
@@ -559,6 +569,9 @@ export const Editor: React.FC<EditorProps> = ({
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'stats'}
+            aria-controls="panel-stats"
             onClick={() => setActiveTab('stats')}
             className={`flex-1 py-2 px-2.5 rounded-xl flex items-center justify-center gap-1.5 font-semibold text-xs whitespace-nowrap transition-all cursor-pointer ${
               activeTab === 'stats' 
@@ -574,11 +587,11 @@ export const Editor: React.FC<EditorProps> = ({
 
       <div className="flex-1 overflow-y-auto px-6 py-4 text-white no-scrollbar">
         {activeTab === 'links' && (
-          <div className="space-y-4 flex flex-col pb-8">
+          <div id="panel-links" role="tabpanel" className="space-y-4 flex flex-col pb-8">
             <button 
               type="button"
               onClick={addLink}
-              className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-600 active:scale-[0.99] text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 transition-all cursor-pointer"
+              className="w-full py-3 bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-600 active:scale-[0.99] text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 transition-all cursor-pointer"
             >
               <Plus className="w-5 h-5" /> Adicionar Link
             </button>
@@ -606,7 +619,7 @@ export const Editor: React.FC<EditorProps> = ({
                       className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
                         (data.theme.buttonTextColor || '#000000').toLowerCase() === '#000000'
                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                          : 'bg-gray-900/60 text-gray-600 border-transparent hover:bg-gray-700'
+                          : 'bg-gray-900/60 text-gray-300 border-transparent hover:bg-gray-700 hover:text-white'
                       }`}
                     >
                       Preto
@@ -617,7 +630,7 @@ export const Editor: React.FC<EditorProps> = ({
                       className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
                         data.theme.buttonTextColor?.toLowerCase() === '#ffffff'
                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                          : 'bg-gray-900/60 text-gray-600 border-transparent hover:bg-gray-700'
+                          : 'bg-gray-900/60 text-gray-300 border-transparent hover:bg-gray-700 hover:text-white'
                       }`}
                     >
                       Branco
@@ -628,7 +641,7 @@ export const Editor: React.FC<EditorProps> = ({
                       className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
                         data.theme.buttonTextColor?.toLowerCase() === '#1f2937'
                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                          : 'bg-gray-900/60 text-gray-600 border-transparent hover:bg-gray-700'
+                          : 'bg-gray-900/60 text-gray-300 border-transparent hover:bg-gray-700 hover:text-white'
                       }`}
                     >
                       Grafite
@@ -639,7 +652,7 @@ export const Editor: React.FC<EditorProps> = ({
                       className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
                         data.theme.buttonTextColor?.toLowerCase() === '#2563eb'
                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                          : 'bg-gray-900/60 text-gray-600 border-transparent hover:bg-gray-700'
+                          : 'bg-gray-900/60 text-gray-300 border-transparent hover:bg-gray-700 hover:text-white'
                       }`}
                     >
                       Azul
@@ -664,7 +677,7 @@ export const Editor: React.FC<EditorProps> = ({
                       className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
                         (data.theme.buttonColor || '#ffffff').toLowerCase() === '#ffffff'
                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                          : 'bg-gray-900/60 text-gray-600 border-transparent hover:bg-gray-700'
+                          : 'bg-gray-900/60 text-gray-300 border-transparent hover:bg-gray-700 hover:text-white'
                       }`}
                     >
                       Branco
@@ -675,7 +688,7 @@ export const Editor: React.FC<EditorProps> = ({
                       className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
                         data.theme.buttonColor?.toLowerCase() === '#18181b'
                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                          : 'bg-gray-900/60 text-gray-600 border-transparent hover:bg-gray-700'
+                          : 'bg-gray-900/60 text-gray-300 border-transparent hover:bg-gray-700 hover:text-white'
                       }`}
                     >
                       Escuro
@@ -686,7 +699,7 @@ export const Editor: React.FC<EditorProps> = ({
                       className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
                         data.theme.buttonColor?.toLowerCase() === '#f3f4f6'
                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                          : 'bg-gray-900/60 text-gray-600 border-transparent hover:bg-gray-700'
+                          : 'bg-gray-900/60 text-gray-300 border-transparent hover:bg-gray-700 hover:text-white'
                       }`}
                     >
                       Cinza Claro
@@ -726,15 +739,14 @@ export const Editor: React.FC<EditorProps> = ({
         )}
 
         {activeTab === 'profile' && (
-          <div className="space-y-6 pb-8">
+          <div id="panel-profile" role="tabpanel" className="space-y-6 pb-8">
             <div className="bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-700/50 space-y-6">
               <div className="space-y-4">
                 <label className="text-sm font-bold text-white block">Foto de Perfil</label>
                 <div className="flex flex-col sm:flex-row gap-4 items-center">
-                  <div 
+                  <button 
+                    type="button"
                     onClick={() => avatarFileInputRef.current?.click()}
-                    role="button"
-                    tabIndex={0}
                     title="Clique ou toque para escolher uma foto"
                     className={`relative w-24 h-24 bg-gray-900/60 border-2 border-dashed border-gray-600 hover:border-blue-500 overflow-hidden flex-shrink-0 flex items-center justify-center cursor-pointer transition-all shadow-sm group ${
                       data.theme.avatarShape === 'round' ? 'rounded-full' : 
@@ -757,13 +769,15 @@ export const Editor: React.FC<EditorProps> = ({
                     </div>
 
                     <input 
+                      id="avatar-file"
                       ref={avatarFileInputRef}
                       type="file" 
                       accept="image/*" 
                       onChange={(e) => handleFileUpload(e, 'image', 'avatarUrl')}
-                      className="hidden" 
+                      className="sr-only" 
+                      tabIndex={-1}
                     />
-                  </div>
+                  </button>
 
                   <div className="flex-1 w-full space-y-2.5 text-center sm:text-left">
                     <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
@@ -793,7 +807,9 @@ export const Editor: React.FC<EditorProps> = ({
                       )}
                     </div>
 
+                    <label htmlFor="avatar-url" className="sr-only">URL do Avatar</label>
                     <input 
+                      id="avatar-url"
                       type="url" 
                       value={data.profile.avatarUrl}
                       onChange={(e) => updateProfile('avatarUrl', e.target.value)}
@@ -827,8 +843,9 @@ export const Editor: React.FC<EditorProps> = ({
               </div>
 
               <div className="space-y-3">
-                <label className="text-sm font-bold text-white block">Nome do Perfil</label>
+                <label htmlFor="profile-name" className="text-sm font-bold text-white block">Nome do Perfil</label>
                 <input 
+                  id="profile-name"
                   type="text" 
                   value={data.profile.name}
                   onChange={(e) => updateProfile('name', e.target.value)}
@@ -838,8 +855,9 @@ export const Editor: React.FC<EditorProps> = ({
               </div>
               
               <div className="space-y-3">
-                <label className="text-sm font-bold text-white block">Biografia</label>
+                <label htmlFor="profile-bio" className="text-sm font-bold text-white block">Biografia</label>
                 <textarea 
+                  id="profile-bio"
                   value={data.profile.bio}
                   onChange={(e) => updateProfile('bio', e.target.value)}
                   placeholder="Conte algo sobre você..."
@@ -863,7 +881,7 @@ export const Editor: React.FC<EditorProps> = ({
                       className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
                         (data.theme.profileTextColor || '#ffffff').toLowerCase() === '#ffffff'
                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                          : 'bg-gray-900/60 text-gray-600 border-transparent hover:bg-gray-700'
+                          : 'bg-gray-900/60 text-gray-300 border-transparent hover:bg-gray-700 hover:text-white'
                       }`}
                     >
                       Branco (Recomendado)
@@ -874,7 +892,7 @@ export const Editor: React.FC<EditorProps> = ({
                       className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
                         data.theme.profileTextColor?.toLowerCase() === '#000000'
                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                          : 'bg-gray-900/60 text-gray-600 border-transparent hover:bg-gray-700'
+                          : 'bg-gray-900/60 text-gray-300 border-transparent hover:bg-gray-700 hover:text-white'
                       }`}
                     >
                       Preto
@@ -887,7 +905,7 @@ export const Editor: React.FC<EditorProps> = ({
         )}
 
         {activeTab === 'theme' && (
-          <div className="space-y-6 pb-8">
+          <div id="panel-theme" role="tabpanel" className="space-y-6 pb-8">
             <div className="bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-700/50 space-y-5 text-center">
               <h3 className="text-lg font-bold text-white mb-2">Fundo</h3>
               
@@ -919,9 +937,9 @@ export const Editor: React.FC<EditorProps> = ({
                     <div className="flex items-center justify-center gap-8">
                       <div className="flex flex-col items-center gap-2">
                         <ColorPicker 
-                          color={(data.theme.backgroundGradient.match(/#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})/g) || ['#ff9a9e'])[0]}
+                          color={(data.theme.backgroundGradient?.match(/#([A-Fa-f0-9]{6,8}|[A-Fa-f0-9]{3,4})|(rgba?|hsla?|oklch)\([^)]+\)/gi) || ['#ff9a9e'])[0]}
                           onChange={(color) => {
-                            const match = data.theme.backgroundGradient.match(/#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})/g);
+                            const match = data.theme.backgroundGradient?.match(/#([A-Fa-f0-9]{6,8}|[A-Fa-f0-9]{3,4})|(rgba?|hsla?|oklch)\([^)]+\)/gi);
                             const c2 = match && match.length > 1 ? match[1] : '#fecfef';
                             updateTheme('backgroundGradient', `linear-gradient(135deg, ${color} 0%, ${c2} 100%)`);
                           }}
@@ -931,9 +949,9 @@ export const Editor: React.FC<EditorProps> = ({
                       </div>
                       <div className="flex flex-col items-center gap-2">
                         <ColorPicker 
-                          color={(data.theme.backgroundGradient.match(/#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})/g) || ['#ff9a9e', '#fecfef'])[1] || '#fecfef'}
+                          color={(data.theme.backgroundGradient?.match(/#([A-Fa-f0-9]{6,8}|[A-Fa-f0-9]{3,4})|(rgba?|hsla?|oklch)\([^)]+\)/gi) || ['#ff9a9e', '#fecfef'])[1] || '#fecfef'}
                           onChange={(color) => {
-                            const match = data.theme.backgroundGradient.match(/#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})/g);
+                            const match = data.theme.backgroundGradient?.match(/#([A-Fa-f0-9]{6,8}|[A-Fa-f0-9]{3,4})|(rgba?|hsla?|oklch)\([^)]+\)/gi);
                             const c1 = match ? match[0] : '#ff9a9e';
                             updateTheme('backgroundGradient', `linear-gradient(135deg, ${c1} 0%, ${color} 100%)`);
                           }}
@@ -1061,7 +1079,7 @@ export const Editor: React.FC<EditorProps> = ({
                           className={`py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
                             currentPos.x === 50 && currentPos.y === 0 
                               ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
-                              : 'bg-gray-900/40 text-gray-600 border-gray-700 hover:bg-gray-900/60'
+                              : 'bg-gray-900/40 text-gray-300 border-gray-700 hover:bg-gray-900/60 hover:text-white'
                           }`}
                         >
                           Topo
@@ -1072,7 +1090,7 @@ export const Editor: React.FC<EditorProps> = ({
                           className={`py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
                             currentPos.x === 50 && currentPos.y === 50 
                               ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
-                              : 'bg-gray-900/40 text-gray-600 border-gray-700 hover:bg-gray-900/60'
+                              : 'bg-gray-900/40 text-gray-300 border-gray-700 hover:bg-gray-900/60 hover:text-white'
                           }`}
                         >
                           Centro
@@ -1083,7 +1101,7 @@ export const Editor: React.FC<EditorProps> = ({
                           className={`py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
                             currentPos.x === 50 && currentPos.y === 100 
                               ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
-                              : 'bg-gray-900/40 text-gray-600 border-gray-700 hover:bg-gray-900/60'
+                              : 'bg-gray-900/40 text-gray-300 border-gray-700 hover:bg-gray-900/60 hover:text-white'
                           }`}
                         >
                           Base
@@ -1094,7 +1112,7 @@ export const Editor: React.FC<EditorProps> = ({
                           className={`py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
                             currentPos.x === 0 && currentPos.y === 50 
                               ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
-                              : 'bg-gray-900/40 text-gray-600 border-gray-700 hover:bg-gray-900/60'
+                              : 'bg-gray-900/40 text-gray-300 border-gray-700 hover:bg-gray-900/60 hover:text-white'
                           }`}
                         >
                           Esquerda
@@ -1105,7 +1123,7 @@ export const Editor: React.FC<EditorProps> = ({
                           className={`py-1.5 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
                             currentPos.x === 100 && currentPos.y === 50 
                               ? 'bg-blue-600 text-white border-blue-600 shadow-sm' 
-                              : 'bg-gray-900/40 text-gray-600 border-gray-700 hover:bg-gray-900/60'
+                              : 'bg-gray-900/40 text-gray-300 border-gray-700 hover:bg-gray-900/60 hover:text-white'
                           }`}
                         >
                           Direita
@@ -1262,21 +1280,21 @@ export const Editor: React.FC<EditorProps> = ({
                         <button
                           type="button"
                           onClick={() => updateTheme('buttonColor', '#ffffff')}
-                          className="px-2 py-1 text-[11px] font-semibold bg-gray-900/60 hover:bg-gray-700 rounded-lg text-gray-600"
+                          className="px-2 py-1 text-[11px] font-semibold bg-gray-900/60 hover:bg-gray-700 rounded-lg text-gray-300 hover:text-white"
                         >
                           Branco
                         </button>
                         <button
                           type="button"
                           onClick={() => updateTheme('buttonColor', '#18181b')}
-                          className="px-2 py-1 text-[11px] font-semibold bg-gray-900/60 hover:bg-gray-700 rounded-lg text-gray-600"
+                          className="px-2 py-1 text-[11px] font-semibold bg-gray-900/60 hover:bg-gray-700 rounded-lg text-gray-300 hover:text-white"
                         >
                           Escuro
                         </button>
                         <button
                           type="button"
                           onClick={() => updateTheme('buttonColor', '#f3f4f6')}
-                          className="px-2 py-1 text-[11px] font-semibold bg-gray-900/60 hover:bg-gray-700 rounded-lg text-gray-600"
+                          className="px-2 py-1 text-[11px] font-semibold bg-gray-900/60 hover:bg-gray-700 rounded-lg text-gray-300 hover:text-white"
                         >
                           Cinza
                         </button>
@@ -1295,21 +1313,21 @@ export const Editor: React.FC<EditorProps> = ({
                         <button
                           type="button"
                           onClick={() => updateTheme('buttonTextColor', '#000000')}
-                          className="px-2 py-1 text-[11px] font-semibold bg-gray-900/60 hover:bg-gray-700 rounded-lg text-gray-600"
+                          className="px-2 py-1 text-[11px] font-semibold bg-gray-900/60 hover:bg-gray-700 rounded-lg text-gray-300 hover:text-white"
                         >
                           Preto
                         </button>
                         <button
                           type="button"
                           onClick={() => updateTheme('buttonTextColor', '#ffffff')}
-                          className="px-2 py-1 text-[11px] font-semibold bg-gray-900/60 hover:bg-gray-700 rounded-lg text-gray-600"
+                          className="px-2 py-1 text-[11px] font-semibold bg-gray-900/60 hover:bg-gray-700 rounded-lg text-gray-300 hover:text-white"
                         >
                           Branco
                         </button>
                         <button
                           type="button"
                           onClick={() => updateTheme('buttonTextColor', '#1f2937')}
-                          className="px-2 py-1 text-[11px] font-semibold bg-gray-900/60 hover:bg-gray-700 rounded-lg text-gray-600"
+                          className="px-2 py-1 text-[11px] font-semibold bg-gray-900/60 hover:bg-gray-700 rounded-lg text-gray-300 hover:text-white"
                         >
                           Grafite
                         </button>
@@ -1333,7 +1351,7 @@ export const Editor: React.FC<EditorProps> = ({
                         className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
                           (data.theme.profileTextColor || '#ffffff').toLowerCase() === '#ffffff'
                             ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                            : 'bg-gray-900/60 text-gray-600 border-transparent hover:bg-gray-700'
+                            : 'bg-gray-900/60 text-gray-300 border-transparent hover:bg-gray-700 hover:text-white'
                         }`}
                       >
                         Branco
@@ -1344,7 +1362,7 @@ export const Editor: React.FC<EditorProps> = ({
                         className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
                           data.theme.profileTextColor?.toLowerCase() === '#000000'
                             ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                            : 'bg-gray-900/60 text-gray-600 border-transparent hover:bg-gray-700'
+                            : 'bg-gray-900/60 text-gray-300 border-transparent hover:bg-gray-700 hover:text-white'
                         }`}
                       >
                         Preto
@@ -1364,17 +1382,19 @@ export const Editor: React.FC<EditorProps> = ({
                 </div>
 
                 <div className="pt-2 flex justify-center">
-                  <label className="flex items-center gap-3 cursor-pointer group">
+                  <label htmlFor="toggle-shadow" className="flex items-center gap-3 cursor-pointer group">
                     <div className={`w-10 h-6 rounded-full p-1 transition-colors ${data.theme.buttonShadow ? 'bg-blue-600' : 'bg-gray-300'}`}>
                       <div className={`w-4 h-4 bg-gray-800 rounded-full shadow-sm transition-transform ${data.theme.buttonShadow ? 'translate-x-4' : 'translate-x-0'}`}></div>
                     </div>
                     <input 
+                      id="toggle-shadow"
                       type="checkbox" 
+                      role="switch"
                       checked={data.theme.buttonShadow}
                       onChange={(e) => updateTheme('buttonShadow', e.target.checked)}
-                      className="hidden"
+                      className="sr-only"
                     />
-                    <span className="text-sm font-semibold text-gray-600">Sombra nos botões</span>
+                    <span className="text-sm font-semibold text-gray-300">Sombra nos botões</span>
                   </label>
                 </div>
               </div>
@@ -1395,19 +1415,20 @@ export const Editor: React.FC<EditorProps> = ({
         )}
 
         {activeTab === 'ad' && (
-          <div className="space-y-6 pb-8">
+          <div id="panel-ad" role="tabpanel" className="space-y-6 pb-8">
             {/* Input oculto para upload de imagem do anúncio */}
             <input 
+              id="ad-image-file"
               type="file" 
               ref={adImageInputRef} 
               onChange={handleAdImageUpload} 
               accept="image/*" 
-              className="hidden" 
+              className="sr-only" 
             />
 
             {/* Cabeçalho do Anúncio */}
             <div className="bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-700/50 text-center space-y-3">
-              <div className="w-12 h-12 bg-gradient-to-tr from-[#ee4d2d] to-[#ff7a45] text-white rounded-full flex items-center justify-center mx-auto shadow-md shadow-orange-500/20">
+              <div className="w-12 h-12 bg-linear-to-tr from-[#ee4d2d] to-[#ff7a45] text-white rounded-full flex items-center justify-center mx-auto shadow-md shadow-orange-500/20">
                 <ShoppingBag className="w-6 h-6" />
               </div>
               <h3 className="text-xl font-bold text-white">Propaganda & Indicação Shopee</h3>
@@ -1438,9 +1459,11 @@ export const Editor: React.FC<EditorProps> = ({
                       : 'O anúncio está pausado e não será exibido.'}
                   </p>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
+                <label htmlFor="toggle-ad" className="relative inline-flex items-center cursor-pointer">
                   <input 
+                    id="toggle-ad"
                     type="checkbox" 
+                    role="switch"
                     checked={data.ad?.enabled ?? defaultAd.enabled} 
                     onChange={(e) => updateAd('enabled', e.target.checked)} 
                     className="sr-only peer"
@@ -1515,11 +1538,9 @@ export const Editor: React.FC<EditorProps> = ({
                   </div>
 
                   <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => adImageInputRef.current?.click()}
-                      disabled={uploadingState['adImage']}
-                      className="flex-1 py-2.5 px-3 bg-gray-900/60 hover:bg-gray-700 text-gray-600 rounded-2xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    <label
+                      htmlFor="ad-image-file"
+                      className={`flex-1 py-2.5 px-3 bg-gray-900/60 hover:bg-gray-700 text-gray-300 hover:text-white rounded-2xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer ${uploadingState['adImage'] ? 'opacity-50 pointer-events-none' : ''}`}
                     >
                       {uploadingState['adImage'] ? (
                         <>
@@ -1532,7 +1553,7 @@ export const Editor: React.FC<EditorProps> = ({
                           <span>Trocar Foto</span>
                         </>
                       )}
-                    </button>
+                    </label>
                     <button
                       type="button"
                       onClick={() => updateAd('imageUrl', '')}
@@ -1544,8 +1565,8 @@ export const Editor: React.FC<EditorProps> = ({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div 
-                    onClick={() => adImageInputRef.current?.click()}
+                  <label 
+                    htmlFor="ad-image-file"
                     className="border-2 border-dashed border-gray-700 hover:border-orange-400 bg-gray-900/40 hover:bg-orange-50/40 rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-2"
                   >
                     <div className="w-10 h-10 bg-orange-100 text-[#ee4d2d] rounded-full flex items-center justify-center">
@@ -1555,7 +1576,7 @@ export const Editor: React.FC<EditorProps> = ({
                       <p className="text-xs font-bold text-gray-200">Clique para enviar foto do produto</p>
                       <p className="text-[11px] text-gray-500 mt-0.5">JPG, PNG ou WebP direto do seu aparelho</p>
                     </div>
-                  </div>
+                  </label>
 
                   <div className="relative flex items-center">
                     <div className="flex-grow border-t border-gray-700"></div>
@@ -1584,7 +1605,7 @@ export const Editor: React.FC<EditorProps> = ({
               <div className="space-y-3">
                 {/* Título */}
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-gray-600 block">Título do Anúncio</label>
+                  <label className="text-xs font-semibold text-gray-300 block">Título do Anúncio</label>
                   <input
                     type="text"
                     value={data.ad?.title ?? defaultAd.title}
@@ -1596,7 +1617,7 @@ export const Editor: React.FC<EditorProps> = ({
 
                 {/* Descrição */}
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-gray-600 block">Descrição Promocional</label>
+                  <label className="text-xs font-semibold text-gray-300 block">Descrição Promocional</label>
                   <textarea
                     rows={2}
                     value={data.ad?.description ?? defaultAd.description}
@@ -1609,7 +1630,7 @@ export const Editor: React.FC<EditorProps> = ({
                 {/* Preços */}
                 <div className="grid grid-cols-2 gap-3 pt-1">
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-gray-600 block">Preço com Desconto</label>
+                    <label className="text-xs font-semibold text-gray-300 block">Preço com Desconto</label>
                     <input
                       type="text"
                       value={data.ad?.price ?? defaultAd.price ?? ''}
@@ -1619,7 +1640,7 @@ export const Editor: React.FC<EditorProps> = ({
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold text-gray-600 block">Preço Original (Riscado)</label>
+                    <label className="text-xs font-semibold text-gray-300 block">Preço Original (Riscado)</label>
                     <input
                       type="text"
                       value={data.ad?.originalPrice ?? defaultAd.originalPrice ?? ''}
@@ -1632,7 +1653,7 @@ export const Editor: React.FC<EditorProps> = ({
 
                 {/* Texto do Botão */}
                 <div className="space-y-1 pt-1">
-                  <label className="text-xs font-semibold text-gray-600 block">Texto do Botão de Ação</label>
+                  <label className="text-xs font-semibold text-gray-300 block">Texto do Botão de Ação</label>
                   <input
                     type="text"
                     value={data.ad?.buttonText ?? defaultAd.buttonText}
@@ -1644,7 +1665,7 @@ export const Editor: React.FC<EditorProps> = ({
 
                 {/* Selo / Badge */}
                 <div className="space-y-1.5 pt-1">
-                  <label className="text-xs font-semibold text-gray-600 block">Selo / Tag em Destaque</label>
+                  <label className="text-xs font-semibold text-gray-300 block">Selo / Tag em Destaque</label>
                   <input
                     type="text"
                     value={data.ad?.badgeText ?? defaultAd.badgeText ?? ''}
@@ -1677,7 +1698,7 @@ export const Editor: React.FC<EditorProps> = ({
 
               {/* Tempo do Cronômetro */}
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-gray-600 block">
+                <label className="text-xs font-semibold text-gray-300 block">
                   Tempo antes de liberar o botão fechar
                 </label>
                 <div className="grid grid-cols-4 gap-2">
@@ -1689,7 +1710,7 @@ export const Editor: React.FC<EditorProps> = ({
                       className={`py-2 px-1 rounded-2xl text-xs font-bold border transition-all text-center cursor-pointer ${
                         (data.ad?.timerSeconds ?? defaultAd.timerSeconds) === sec
                           ? 'bg-[#ee4d2d] text-white border-[#ee4d2d] shadow-sm'
-                          : 'bg-gray-900/40 hover:bg-gray-900/60 text-gray-600 border-gray-700'
+                          : 'bg-gray-900/40 hover:bg-gray-900/60 text-gray-300 border-gray-700 hover:text-white'
                       }`}
                     >
                       {sec} segundos
@@ -1703,7 +1724,7 @@ export const Editor: React.FC<EditorProps> = ({
 
               {/* Frequência */}
               <div className="space-y-2 pt-2 border-t border-gray-700/50">
-                <label className="text-xs font-semibold text-gray-600 block">
+                <label className="text-xs font-semibold text-gray-300 block">
                   Frequência de reexibição para o mesmo visitante
                 </label>
                 <div className="grid grid-cols-4 gap-2">
@@ -1715,7 +1736,7 @@ export const Editor: React.FC<EditorProps> = ({
                       className={`py-2 px-1 rounded-2xl text-xs font-bold border transition-all text-center cursor-pointer ${
                         (data.ad?.frequencyHours ?? defaultAd.frequencyHours) === hrs
                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                          : 'bg-gray-900/40 hover:bg-gray-900/60 text-gray-600 border-gray-700'
+                          : 'bg-gray-900/40 hover:bg-gray-900/60 text-gray-300 border-gray-700 hover:text-white'
                       }`}
                     >
                       {hrs === 1 ? '1 hora' : hrs === 24 ? '1 dia' : `${hrs} horas`}
@@ -1731,7 +1752,7 @@ export const Editor: React.FC<EditorProps> = ({
         )}
 
         {activeTab === 'stats' && (
-          <div className="space-y-6 pb-8">
+          <div id="panel-stats" role="tabpanel" className="space-y-6 pb-8">
             {loadingMetrics ? (
               <div className="flex flex-col items-center justify-center py-20 text-gray-500">
                  <Loader2 className="w-8 h-8 animate-spin mb-4" />
@@ -1750,12 +1771,12 @@ export const Editor: React.FC<EditorProps> = ({
               </div>
 
               {/* Card Destaque: Intenção de Compra (Propaganda / Shopee) */}
-              <div className="relative overflow-hidden rounded-3xl p-5 sm:p-6 border border-orange-500/30 bg-gradient-to-br from-orange-950/40 via-gray-800 to-gray-800 shadow-lg shadow-orange-950/20">
-                <div className="absolute top-0 right-0 w-44 h-44 bg-gradient-to-bl from-orange-500/10 to-transparent rounded-full blur-2xl pointer-events-none" />
+              <div className="relative overflow-hidden rounded-3xl p-5 sm:p-6 border border-orange-500/30 bg-linear-to-br from-orange-950/40 via-gray-800 to-gray-800 shadow-lg shadow-orange-950/20">
+                <div className="absolute top-0 right-0 w-44 h-44 bg-linear-to-bl from-orange-500/10 to-transparent rounded-full blur-2xl pointer-events-none" />
                 
                 <div className="flex items-start justify-between gap-3 mb-4 relative z-10">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#ee4d2d] to-[#ff5722] text-white flex items-center justify-center shadow-md shadow-orange-500/30 flex-shrink-0">
+                    <div className="w-12 h-12 rounded-2xl bg-linear-to-br from-[#ee4d2d] to-[#ff5722] text-white flex items-center justify-center shadow-md shadow-orange-500/30 flex-shrink-0">
                       <ShoppingBag className="w-6 h-6" />
                     </div>
                     <div>
@@ -1833,7 +1854,7 @@ export const Editor: React.FC<EditorProps> = ({
               <div className="space-y-5">
                 {/* Linha destacada da Propaganda Shopee */}
                 {(metrics.adClicks > 0 || data.ad?.enabled) && (
-                  <div className="p-3.5 rounded-2xl bg-gradient-to-r from-orange-950/30 via-gray-900/60 to-gray-900/40 border border-orange-500/25 space-y-2">
+                  <div className="p-3.5 rounded-2xl bg-linear-to-r from-orange-950/30 via-gray-900/60 to-gray-900/40 border border-orange-500/25 space-y-2">
                     <div className="flex justify-between items-center text-sm gap-2">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-[#ee4d2d] text-white shadow-xs flex-shrink-0 flex items-center gap-1">
@@ -1851,7 +1872,7 @@ export const Editor: React.FC<EditorProps> = ({
                     </div>
                     <div className="h-2 w-full bg-gray-950/60 rounded-full overflow-hidden">
                       <div 
-                        className="h-full bg-gradient-to-r from-[#ee4d2d] to-[#ff7a45] rounded-full transition-all duration-1000 ease-out" 
+                        className="h-full bg-linear-to-r from-[#ee4d2d] to-[#ff7a45] rounded-full transition-all duration-1000 ease-out" 
                         style={{ 
                           width: `${Math.min(100, Math.round((metrics.adClicks / Math.max(1, ...data.links.map(l => metrics.clicksByLink[l.id] || 0), metrics.adClicks)) * 100))}%` 
                         }}

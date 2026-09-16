@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FullscreenCircleTransition, CircleTransitionData } from './FullscreenCircleTransition';
+import FullscreenCircleTransition, { CircleTransitionData } from './FullscreenCircleTransition';
 import { AppData, Theme, BackgroundPosition, ThumbnailShape, ButtonRadius, LinkItem } from '../types';
-import { Share2, X, ShoppingBag, ExternalLink, Clock, ShieldCheck, Sparkles, Move, Check, RotateCcw, Truck, Flame, Tag } from 'lucide-react';
+import { Share2, Move, Check, RotateCcw, X } from 'lucide-react';
 import { db, isFirebaseConfigured } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
 import { getCachedVideoBlob, setCachedVideoBlob } from '../lib/videoCache';
 import { sanitizeCssUrl, sanitizeUrl, isPrivateUrl } from '../lib/sanitize';
@@ -35,6 +35,9 @@ const getBackgroundStyle = (theme: Theme, position: BackgroundPosition = { x: 50
         backgroundSize: '300% 300%'
       };
     case 'image':
+      if (isPrivateUrl(theme.backgroundImageUrl || '')) {
+        return { backgroundColor: theme.backgroundColor || '#111827' };
+      }
       return { 
         backgroundImage: sanitizeCssUrl(theme.backgroundImageUrl || ''),
         backgroundSize: 'cover',
@@ -51,8 +54,8 @@ const getBackgroundStyle = (theme: Theme, position: BackgroundPosition = { x: 50
   }
 };
 
-const getAnimationVariants = (animation?: string) => {
-  const baseVisible = { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } };
+const getAnimationVariants = (animation?: string): Variants => {
+  const baseVisible = { opacity: 1, y: 0, transition: { type: 'spring' as const, stiffness: 300, damping: 24 } };
   
   if (!animation || animation === 'none') {
     return {
@@ -60,12 +63,6 @@ const getAnimationVariants = (animation?: string) => {
       visible: baseVisible
     };
   }
-
-  const loopTransition = { 
-    repeat: Infinity, 
-    repeatType: 'reverse' as const, 
-    duration: 1.5 
-  };
 
   switch (animation) {
     case 'pulse':
@@ -237,7 +234,7 @@ const getAppliedThemeColors = (theme: Theme, link?: LinkItem) => {
 
   if (theme.backgroundType === 'gradient' || theme.backgroundType === 'animated-gradient') {
     themeBackground = theme.backgroundGradient || 'linear-gradient(135deg, #18181b 0%, #09090b 100%)';
-    const matches = themeBackground.match(/#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})|rgba?\([^)]+\)/g);
+    const matches = themeBackground.match(/#([A-Fa-f0-9]{6,8}|[A-Fa-f0-9]{3,4})|(rgba?|hsla?|oklch)\([^)]+\)/gi);
     if (matches && matches.length > 0) {
       themeBaseColor = matches[0];
       themeAccent = matches.length > 1 ? matches[1] : matches[0];
@@ -276,7 +273,7 @@ const getAppliedThemeColors = (theme: Theme, link?: LinkItem) => {
     finalColor === 'transparent'
   ) {
     if (theme.backgroundGradient) {
-      const matches = theme.backgroundGradient.match(/#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})|rgba?\([^)]+\)/g);
+      const matches = theme.backgroundGradient.match(/#([A-Fa-f0-9]{6,8}|[A-Fa-f0-9]{3,4})|(rgba?|hsla?|oklch)\([^)]+\)/gi);
       const nonWhite = matches?.find(m => m.toLowerCase() !== '#ffffff' && m.toLowerCase() !== '#fff');
       if (nonWhite) {
         finalColor = nonWhite;
@@ -428,11 +425,13 @@ const LinkItemCard: React.FC<LinkItemCardProps> = React.memo(({
     }, 450);
   };
 
+  const animationVariants = React.useMemo(() => getAnimationVariants(link.animation), [link.animation]);
+
   return (
     <motion.a 
       onPointerDown={handlePointerDown}
       onClick={handleClick}
-      variants={getAnimationVariants(link.animation)}
+      variants={animationVariants}
       whileHover={{ scale: 1.015, y: -1 }}
       href={normalizedUrl} 
       target="_blank" 
@@ -487,7 +486,7 @@ const LinkItemCard: React.FC<LinkItemCardProps> = React.memo(({
 
       {format === 'featured' ? (
         <div className="flex flex-col w-full">
-          {link.thumbnailUrl && (
+          {link.thumbnailUrl && !isPrivateUrl(link.thumbnailUrl) && (
             <div className="w-full h-40 bg-black/5 flex-shrink-0">
               <img src={link.thumbnailUrl} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
             </div>
@@ -499,7 +498,7 @@ const LinkItemCard: React.FC<LinkItemCardProps> = React.memo(({
         </div>
       ) : format === 'compact' ? (
         <div className="relative w-full flex items-center justify-center min-h-[46px] py-2 px-3 text-center">
-          {link.thumbnailUrl && (
+          {link.thumbnailUrl && !isPrivateUrl(link.thumbnailUrl) && (
             <img 
               src={link.thumbnailUrl} 
               alt="" 
@@ -520,13 +519,13 @@ const LinkItemCard: React.FC<LinkItemCardProps> = React.memo(({
         </div>
       ) : format === 'banner' ? (
         <div className="w-full relative h-32 flex flex-col justify-end overflow-hidden group-hover:scale-[1.01] transition-transform">
-          {link.thumbnailUrl ? (
+          {link.thumbnailUrl && !isPrivateUrl(link.thumbnailUrl) ? (
             <>
-               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent z-10" />
+               <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/30 to-transparent z-10" />
                <img src={link.thumbnailUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 w-full h-full object-cover z-0" />
             </>
           ) : (
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/10 z-10" />
+            <div className="absolute inset-0 bg-linear-to-t from-black/60 to-black/10 z-10" />
           )}
           <div className="relative z-20 p-4 w-full text-center text-white">
             <div className="font-bold text-xl drop-shadow-md">{link.title}</div>
@@ -536,7 +535,7 @@ const LinkItemCard: React.FC<LinkItemCardProps> = React.memo(({
       ) : (
         // Formato Classic (Padrão) - Centralizado
         <div className="relative w-full flex items-center justify-center min-h-[58px] py-3.5 px-4 text-center">
-          {link.thumbnailUrl && (
+          {link.thumbnailUrl && !isPrivateUrl(link.thumbnailUrl) && (
             <div className={`absolute ${isRight ? 'right-3.5' : 'left-3.5'} top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center ${thumbShapeClass} overflow-hidden flex-shrink-0`}>
               <img src={link.thumbnailUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
             </div>
@@ -730,18 +729,23 @@ export const Preview: React.FC<PreviewProps> = ({
 
       const freqHours = ad.frequencyHours ?? 3;
       const freqMs = freqHours * 60 * 60 * 1000;
-      const lastSeenStr = localStorage.getItem('linkhub_last_ad_seen');
-      const lastUpdatedStr = localStorage.getItem('linkhub_last_ad_updated_at');
+      try {
+        const lastSeenStr = localStorage.getItem('linkhub_last_ad_seen');
+        const lastUpdatedStr = localStorage.getItem('linkhub_last_ad_updated_at');
 
-      const now = Date.now();
-      const hasExpired = !lastSeenStr || (now - Number(lastSeenStr) >= freqMs);
-      const isNewAdVersion = Boolean(ad.updatedAt && (!lastUpdatedStr || Number(lastUpdatedStr) < ad.updatedAt));
+        const now = Date.now();
+        const hasExpired = !lastSeenStr || (now - Number(lastSeenStr) >= freqMs);
+        const isNewAdVersion = Boolean(ad.updatedAt && (!lastUpdatedStr || Number(lastUpdatedStr) < ad.updatedAt));
 
-      if (hasExpired || isNewAdVersion) {
-        setIsAdOpen(true);
-        if (ad.updatedAt) {
-          localStorage.setItem('linkhub_last_ad_updated_at', ad.updatedAt.toString());
+        if (hasExpired || isNewAdVersion) {
+          setIsAdOpen(true);
+          if (ad.updatedAt) {
+            localStorage.setItem('linkhub_last_ad_updated_at', ad.updatedAt.toString());
+          }
         }
+      } catch (e) {
+        // Fallback gracefully in incognito mode
+        console.warn('localStorage is not available for ad tracking.');
       }
     };
 
@@ -774,17 +778,29 @@ export const Preview: React.FC<PreviewProps> = ({
     let objectUrl: string | null = null;
     let isMounted = true;
     setIsVideoReady(false);
-    
+    const cleanup = () => {
+      isMounted = false;
+      objectUrlsThisRunRef.current.forEach(u => {
+        URL.revokeObjectURL(u);
+        for (const [key, val] of videoBlobCache.entries()) {
+          if (val === u) videoBlobCache.delete(key);
+        }
+      });
+      objectUrlsThisRunRef.current.clear();
+    };
+
     if (url && url.startsWith('firestore_chunked|')) {
-      if (!isFirebaseConfigured) {
+      if (!isFirebaseConfigured || !db) {
         setResolvedVideoUrl(null);
-        return;
+        return cleanup;
       }
 
       // 1. Check in-memory cache first for instant 0ms playback
       if (videoBlobCache.has(url)) {
-        setResolvedVideoUrl(videoBlobCache.get(url)!);
-        return;
+        const cachedObjUrl = videoBlobCache.get(url)!;
+        setResolvedVideoUrl(cachedObjUrl);
+        objectUrlsThisRunRef.current.add(cachedObjUrl);
+        return cleanup;
       }
 
       // 2. Check persistent IndexedDB cache (0-15ms local disk playback on repeat visits)
@@ -804,10 +820,11 @@ export const Preview: React.FC<PreviewProps> = ({
       const totalChunks = parseInt(chunksStr, 10);
       
       const loadVideo = async () => {
+        if (!db) return;
         try {
           // Download ALL chunks in parallel with Promise.all (cuts time by 80-90%)
           const chunkPromises = Array.from({ length: totalChunks }, (_, i) => 
-            getDoc(doc(db, 'media_chunks', `${fileId}_chunk_${i}`))
+            getDoc(doc(db!, 'media_chunks', `${fileId}_chunk_${i}`))
           );
           const snaps = await Promise.all(chunkPromises);
 
@@ -841,22 +858,11 @@ export const Preview: React.FC<PreviewProps> = ({
         }
       };
       loadVideo();
-      
-      return () => {
-        isMounted = false;
-        objectUrlsThisRunRef.current.forEach(u => {
-          URL.revokeObjectURL(u);
-          for (const [key, val] of videoBlobCache.entries()) {
-            if (val === u) {
-              videoBlobCache.delete(key);
-            }
-          }
-        });
-        objectUrlsThisRunRef.current.clear();
-      };
     } else {
       setResolvedVideoUrl(url || null);
     }
+
+    return cleanup;
   }, [theme.backgroundVideoUrl]);
 
   return (
@@ -884,6 +890,7 @@ export const Preview: React.FC<PreviewProps> = ({
           poster={theme.backgroundImageUrl || undefined}
           onLoadedData={() => setIsVideoReady(true)}
           onCanPlay={() => setIsVideoReady(true)}
+          onError={() => { setIsVideoReady(true); setIsBackgroundReady(true); }}
           className={`absolute inset-0 w-full h-full object-cover pointer-events-none z-0 transition-opacity duration-700 ease-out transform-gpu will-change-transform ${isVideoReady ? 'opacity-100' : 'opacity-0'}`}
           style={{ objectPosition: `${activePosition.x}% ${activePosition.y}%` }}
         >
@@ -974,7 +981,7 @@ export const Preview: React.FC<PreviewProps> = ({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 25 }}
           >
-          {profile.avatarUrl ? (
+          {profile.avatarUrl && !isPrivateUrl(profile.avatarUrl) ? (
             <img 
               src={profile.avatarUrl} 
               alt={profile.name}
@@ -1046,6 +1053,8 @@ export const Preview: React.FC<PreviewProps> = ({
             className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           >
             <motion.div
+              role="dialog"
+              aria-modal="true"
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -1096,12 +1105,12 @@ export const Preview: React.FC<PreviewProps> = ({
         {!isBackgroundReady && (
           <motion.div 
             initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.7, ease: "easeOut" }}
+            exit={{ opacity: 0, pointerEvents: "none" }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
             className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-2xl touch-none pointer-events-auto"
           >
             <div className="flex flex-col items-center gap-4 animate-pulse">
-              <div className="w-10 h-10 rounded-full border-3 border-white/50 border-t-white animate-spin drop-shadow-md"></div>
+              <div className="w-10 h-10 rounded-full border-[3px] border-white/50 border-t-white animate-spin drop-shadow-md"></div>
               <p className="text-white text-sm font-medium tracking-wide drop-shadow-md">Carregando...</p>
             </div>
           </motion.div>

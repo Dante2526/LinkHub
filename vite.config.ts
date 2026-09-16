@@ -34,6 +34,13 @@ export default defineConfig(() => {
             if (id.includes('node_modules/react-colorful')) {
               return 'vendor-colorpicker';
             }
+            if (id.includes('node_modules/lucide-react')) {
+              return 'vendor-lucide';
+            }
+            if (id.includes('node_modules/@ffmpeg')) {
+              return 'vendor-ffmpeg';
+            }
+            return undefined;
           },
         },
       },

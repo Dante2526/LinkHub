@@ -18,9 +18,8 @@ export async function checkIsAdminAuthorized(email: string): Promise<AdminAuthRe
   }
 
   // Se o Firebase não estiver configurado nesta instância local de desenvolvimento
-  if (!isFirebaseConfigured) {
-    console.warn('Firebase não configurado localmente. Permitindo acesso em modo offline para desenvolvimento.');
-    return { authorized: true };
+  if (!isFirebaseConfigured || !db) {
+    return { authorized: false, reason: 'Firebase não configurado localmente.' };
   }
 
   try {
@@ -57,42 +56,13 @@ export async function checkIsAdminAuthorized(email: string): Promise<AdminAuthRe
       return { authorized: true };
     }
 
-    // 3. Fallback de verificação flexível (ignora maiúsculas/espaços em branco)
-    try {
-      const allAdmins = await getDocs(collection(db, 'administradores'));
-      if (allAdmins.empty) {
-        return {
-          authorized: false,
-          reason: 'Acesso negado: Nenhum administrador cadastrado no momento.'
-        };
-      }
-
-      const matchDoc = allAdmins.docs.find(d => {
-        const dData = d.data();
-        const emailField = (dData?.email || '').toString().trim().toLowerCase();
-        const docId = d.id.trim().toLowerCase();
-        return emailField === normalized || docId === normalized;
-      });
-
-      if (matchDoc) {
-        const docData = matchDoc.data();
-        if (docData?.ativo === false) {
-          return { 
-            authorized: false, 
-            reason: 'Acesso bloqueado: Este e-mail administrativo está desativado.' 
-          };
-        }
-        return { authorized: true };
-      }
-    } catch {
-      // Ignora erro secundário de listagem
-    }
+    // 3. (Removido: Fallback scan inseguro)
 
     return {
       authorized: false,
       reason: `Acesso negado: O e-mail "${normalized}" não possui permissão de administrador.`
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error('Erro ao verificar permissão:', error);
     
     return {
