@@ -18,6 +18,11 @@ export function sanitizeUrl(raw: string): string {
     return trimmed;
   }
   
+  // Permite URIs internos customizados do app
+  if (trimmed.startsWith('firestore_chunked|')) {
+    return trimmed;
+  }
+  
   if (!SAFE_URL_RE.test(trimmed)) {
     return `https://${trimmed}`;
   }

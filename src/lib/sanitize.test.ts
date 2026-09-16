@@ -36,6 +36,10 @@ describe('sanitizeUrl', () => {
     expect(sanitizeUrl('?query=1')).toBe('?query=1');
     expect(sanitizeUrl('#hash')).toBe('#hash');
   });
+
+  it('allows internal firestore_chunked URIs', () => {
+    expect(sanitizeUrl('firestore_chunked|vid_123_abc')).toBe('firestore_chunked|vid_123_abc');
+  });
 });
 
 describe('sanitizeCssUrl', () => {
