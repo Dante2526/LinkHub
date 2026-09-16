@@ -3,12 +3,27 @@ import { AppData, LinkItem, Theme, Advertisement, defaultAd, BackgroundPosition,
 import { GripVertical, Plus, Trash2, Image as ImageIcon, Video, Palette, Link as LinkIcon, User, Camera, BarChart3, MousePointerClick, Clock, Calendar, Eye, Loader2, Upload, ShoppingBag, Megaphone, Sparkles, ExternalLink, Play, Tag, Timer, CheckCircle2, Move, Smartphone, Monitor } from 'lucide-react';
 import { ColorPicker } from './ColorPicker';
 import { CustomSelect, SelectOption } from './CustomSelect';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { collection, getCountFromServer, getDocs, query, orderBy, limit, setDoc, doc, where } from 'firebase/firestore';
 import { db, storage, isFirebaseConfigured } from '../lib/firebase';
 import { sanitizeUrl } from '../lib/sanitize';
 import { Reorder } from 'framer-motion';
 import { LinkItemEditorRow } from './LinkItemEditorRow';
+import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { fetchFile } from '@ffmpeg/util';
+
+const uploadToStorage = async (file: File | Blob, path: string, onProgress?: (pct: number) => void): Promise<string> => {
+  if (!storage) throw new Error("Firebase Storage is not initialized.");
+  const storageRef = ref(storage, path);
+  const task = uploadBytesResumable(storageRef, file, { contentType: file.type || 'application/octet-stream' });
+  return new Promise((resolve, reject) => {
+    task.on('state_changed',
+      (snap) => onProgress?.(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+      reject,
+      async () => resolve(await getDownloadURL(task.snapshot.ref))
+    );
+  });
+};
 
 const BACKGROUND_TYPE_OPTIONS: SelectOption[] = [
   { value: 'color', label: 'Cor Sólida', subtitle: 'Cor única de fundo' },
@@ -109,6 +124,9 @@ export const Editor: React.FC<EditorProps> = ({
   const [activeTab, setActiveTab] = useState<'profile' | 'links' | 'theme' | 'ad' | 'stats'>('links');
   const [uploadingState, setUploadingState] = useState<Record<string, boolean>>({});
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [conversionState, setConversionState] = useState<Record<string, string>>({});
+  const ffmpegRef = useRef(new FFmpeg());
+  const [isFfmpegLoaded, setIsFfmpegLoaded] = useState(false);
   const [metrics, setMetrics] = useState({ 
     views: 0, 
     clicks: 0, 
@@ -366,6 +384,12 @@ export const Editor: React.FC<EditorProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!isFirebaseConfigured) {
+      alert("O Firebase não está configurado. O upload de arquivos para a nuvem está desativado.");
+      e.target.value = '';
+      return;
+    }
+
     if (!ALLOWED_MIME[type].includes(file.type)) {
       alert(`Tipo não permitido: ${file.type || 'desconhecido'}`);
       e.target.value = '';
@@ -386,41 +410,70 @@ export const Editor: React.FC<EditorProps> = ({
         // Converte e comprime a imagem localmente de forma instantânea
         const maxDimension = targetField === 'avatarUrl' ? 256 : targetField === 'linkThumb' ? 200 : 1000;
         const compressedDataUrl = await compressImageToDataUrl(file, maxDimension, 0.75);
-        const resolvedUrl = compressedDataUrl || URL.createObjectURL(file);
+        
+        // Converter dataUrl para Blob
+        const response = await fetch(compressedDataUrl);
+        const blob = await response.blob();
+        
+        // Fazer upload para o Firebase Storage
+        const path = `users/images/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+        const url = await uploadToStorage(blob, path, (pct) => setUploadProgress(prev => ({ ...prev, [uploadKey]: pct })));
 
-        // Aplica imediatamente e persiste via Firestore/LocalStorage no App.tsx
+        // Aplica a URL pública
         if (targetField === 'avatarUrl') {
-          updateProfile('avatarUrl', resolvedUrl);
+          updateProfile('avatarUrl', url);
         } else if (targetField === 'linkThumb' && linkId) {
-          updateLink(linkId, 'thumbnailUrl', resolvedUrl);
+          updateLink(linkId, 'thumbnailUrl', url);
         } else {
-          updateTheme(targetField as keyof Theme, resolvedUrl);
+          updateTheme(targetField as keyof Theme, url);
         }
       } else if (type === 'video') {
-        // Quebra em chunks no Firestore para vídeos
-        const base64String = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
+        let videoFileToUpload = file;
 
-        // Base64 tem ~33% overhead: 600KB de chars → ~450KB de binário real → seguro abaixo de 1MB por doc
-        const chunkSize = 600 * 1024;
-        const totalChunks = Math.ceil(base64String.length / chunkSize);
-        const fileId = `vid_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        // Tenta converter se não for webm e for vídeo
+        if (file.type !== 'video/webm' && file.type.startsWith('video/')) {
+          try {
+            const ffmpeg = ffmpegRef.current;
+            if (!isFfmpegLoaded) {
+              setConversionState(prev => ({ ...prev, [uploadKey]: 'Carregando conversor...' }));
+              await ffmpeg.load({
+                coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
+                wasmURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm',
+              });
+              setIsFfmpegLoaded(true);
+            }
 
-        for (let i = 0; i < totalChunks; i++) {
-          const chunkData = base64String.slice(i * chunkSize, (i + 1) * chunkSize);
-          await setDoc(doc(db, 'media_chunks', `${fileId}_chunk_${i}`), {
-            data: chunkData,
-            index: i,
-            fileId: fileId
-          });
-          setUploadProgress(prev => ({ ...prev, [uploadKey]: Math.round(((i + 1) / totalChunks) * 100) }));
+            setConversionState(prev => ({ ...prev, [uploadKey]: 'Convertendo... 0%' }));
+            
+            ffmpeg.on('progress', ({ progress }) => {
+              const percentage = Math.round(progress * 100);
+              setConversionState(prev => ({ ...prev, [uploadKey]: `Convertendo... ${percentage}%` }));
+            });
+
+            await ffmpeg.writeFile('input.mp4', await fetchFile(file));
+            
+            // Executa conversão
+            await ffmpeg.exec(['-i', 'input.mp4', '-c:v', 'libvpx-vp9', '-crf', '30', '-b:v', '0', '-an', 'output.webm']);
+            
+            const fileData = await ffmpeg.readFile('output.webm');
+            const data = new Uint8Array(fileData as ArrayBuffer);
+            videoFileToUpload = new File([data], 'video.webm', { type: 'video/webm' });
+            
+            // Limpa arquivos temporários do FFmpeg
+            await ffmpeg.deleteFile('input.mp4');
+            await ffmpeg.deleteFile('output.webm');
+          } catch (e) {
+            console.error('Erro na conversão de video', e);
+            // Fallback para o arquivo original se der erro
+          } finally {
+            setConversionState(prev => ({ ...prev, [uploadKey]: '' })); // Limpa status
+          }
         }
+
+        // Upload do vídeo para o Firebase Storage
+        const path = `users/videos/${Date.now()}_${Math.random().toString(36).substring(7)}.webm`;
+        const url = await uploadToStorage(videoFileToUpload, path, (pct) => setUploadProgress(prev => ({ ...prev, [uploadKey]: pct })));
         
-        const url = `firestore_chunked|${fileId}|${totalChunks}`;
         updateTheme(targetField as keyof Theme, url);
       }
     } catch (err) {
@@ -432,6 +485,7 @@ export const Editor: React.FC<EditorProps> = ({
       }
       setUploadingState(prev => ({ ...prev, [uploadKey]: false }));
       setUploadProgress(prev => ({ ...prev, [uploadKey]: 0 }));
+      setConversionState(prev => ({ ...prev, [uploadKey]: '' }));
     }
   };
 
@@ -938,7 +992,17 @@ export const Editor: React.FC<EditorProps> = ({
                          {uploadingState['backgroundVideoUrl'] ? (
                            <div className="flex flex-col items-center">
                              <Loader2 className="w-4 h-4 animate-spin" />
-                             {uploadProgress['backgroundVideoUrl'] > 0 && <span className="text-[10px] leading-tight font-medium mt-0.5">{uploadProgress['backgroundVideoUrl']}%</span>}
+                             {conversionState['backgroundVideoUrl'] ? (
+                               <span className="text-[9px] leading-tight font-medium mt-0.5 text-center px-1">
+                                 {conversionState['backgroundVideoUrl']}
+                               </span>
+                             ) : (
+                               uploadProgress['backgroundVideoUrl'] > 0 && (
+                                 <span className="text-[10px] leading-tight font-medium mt-0.5">
+                                   {uploadProgress['backgroundVideoUrl']}%
+                                 </span>
+                               )
+                             )}
                            </div>
                          ) : <Upload className="w-5 h-5" />}
                        </button>
