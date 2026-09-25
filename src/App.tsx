@@ -3,8 +3,9 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AppData, BackgroundPosition } from './types';
 import { Preview } from './components/Preview';
 import { Smartphone, Monitor, ExternalLink, Loader2, LogOut } from 'lucide-react';
+import { Maintenance } from './components/Maintenance';
 import { useAuth } from './hooks/useAuth';
-import { useMetrics } from './hooks/useMetrics';
+// import { useMetrics } from './hooks/useMetrics';
 import { useLinkHubData } from './hooks/useLinkHubData';
 
 const LazyEditor = lazy(() => import('./components/Editor').then(m => ({ default: m.Editor })));
@@ -224,6 +225,7 @@ function AdminView({
   );
 }
 
+/*
 function PublicView({ data, onLinkClick, onView }: { data: AppData, onLinkClick: (id: string) => void, onView: () => void }) {
   useEffect(() => {
     onView();
@@ -272,11 +274,12 @@ function PublicView({ data, onLinkClick, onView }: { data: AppData, onLinkClick:
     </div>
   );
 }
+*/
 
 export default function App() {
   const { data, loading, handleUpdateData } = useLinkHubData();
   const { adminEmail, handleLogin, handleLogout } = useAuth();
-  const { handleLinkClick, handleView } = useMetrics(data?.ad);
+  // const { handleLinkClick, handleView } = useMetrics(data?.ad);
 
   const isAdminDomain = window.location.hostname.includes('-adm');
 
@@ -322,7 +325,7 @@ export default function App() {
           <Route path="/" element={renderAdmin()} />
         ) : (
           <>
-            <Route path="/" element={<PublicView data={data} onLinkClick={handleLinkClick} onView={handleView} />} />
+            <Route path="/" element={<Maintenance />} />
             <Route path="/admin" element={renderAdmin()} />
           </>
         )}
